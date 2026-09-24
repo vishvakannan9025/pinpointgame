@@ -24,8 +24,9 @@ export const QuestionManager = () => {
   const handleOpenAdd = () => {
     setEditingQuestion({
       id: Date.now().toString(),
-      question: 'Mystery Challenge',
+      question: '4-Clue Visual Challenge',
       clues: ['', '', '', ''],
+      clueImages: ['', '', '', ''],
       answer: '',
       points: 10,
     });
@@ -33,11 +34,18 @@ export const QuestionManager = () => {
   };
 
   const handleOpenEdit = (q) => {
+    const rawClues = q.clues && q.clues.length >= 4
+      ? [...q.clues]
+      : [...(q.clues || []), '', '', '', ''].slice(0, 4);
+
+    const rawImages = q.clueImages && q.clueImages.length >= 4
+      ? [...q.clueImages]
+      : [...(q.clueImages || []), '', '', '', ''].slice(0, 4);
+
     setEditingQuestion({
       ...q,
-      clues: q.clues && q.clues.length >= 4
-        ? [...q.clues]
-        : [...(q.clues || []), '', '', '', ''].slice(0, 4),
+      clues: rawClues,
+      clueImages: rawImages,
       answer: q.answer || (q.options ? q.options[q.correctOptionIndex || 0] : ''),
     });
     setIsModalOpen(true);
@@ -74,23 +82,34 @@ export const QuestionManager = () => {
   const currentLive = questions[activeQuestionIndex];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Top Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '14px',
+        padding: '24px 28px',
+        borderRadius: 'var(--radius-lg)',
+        background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.9) 100%)',
+        border: '1.5px solid rgba(99, 102, 241, 0.4)',
+        boxShadow: 'var(--shadow-card)',
+      }}>
         <div>
-          <h2 style={{ fontSize: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>💡</span> PINPOINT 4-CLUE CHALLENGE BANK
+          <h2 style={{ fontSize: '22px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span>💡</span> 4-CLUE CHALLENGE & IMAGE BANK
           </h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '12.5px' }}>
-            Manage mystery challenges with 4 progressive clues (Clue 1 → Clue 2 → Clue 3 → Clue 4 → Final Answer).
+          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px' }}>
+            Manage mystery challenges with 4 progressive clues + images (Clue 1 → Clue 2 → Clue 3 → Clue 4 → Final Answer).
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={resetToSampleQuestions} className="btn btn-secondary btn-sm">
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button onClick={resetToSampleQuestions} className="btn btn-secondary btn-sm" style={{ padding: '8px 16px' }}>
             🔄 Reset 5 Samples
           </button>
-          <button onClick={handleOpenAdd} className="btn btn-primary btn-sm">
+          <button onClick={handleOpenAdd} className="btn btn-primary btn-sm pulsing-glow" style={{ padding: '8px 20px', fontWeight: 800 }}>
             ➕ Add Challenge
           </button>
         </div>
@@ -99,7 +118,7 @@ export const QuestionManager = () => {
       {/* Live Stage Broadcaster Bar */}
       {questions.length > 0 && currentLive && (
         <div className="glass-card" style={{
-          padding: '18px 24px',
+          padding: '20px 24px',
           background: 'linear-gradient(135deg, rgba(20, 30, 50, 0.95) 0%, rgba(26, 39, 66, 0.95) 100%)',
           border: '1.5px solid rgba(99, 102, 241, 0.5)',
           display: 'flex',
@@ -116,10 +135,15 @@ export const QuestionManager = () => {
               color: 'var(--accent-cyan)',
               marginBottom: '4px',
             }}>
-              ACTIVE LIVE CHALLENGE: #{activeQuestionIndex + 1} OF {questions.length} • {revealedClueCount} OF 4 CLUES REVEALED
+              BROADCASTING LIVE: #{activeQuestionIndex + 1} OF {questions.length} • {revealedClueCount} OF 4 CLUES REVEALED
             </div>
-            <div style={{ fontSize: '15px', fontWeight: 700, color: '#FFFFFF' }}>
-              CLUE {revealedClueCount}: {currentLive.clues && currentLive.clues[revealedClueCount - 1] ? currentLive.clues[revealedClueCount - 1] : '(No clue)'}
+            <div style={{ fontSize: '15px', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span>CLUE {revealedClueCount}: {currentLive.clues && currentLive.clues[revealedClueCount - 1] ? currentLive.clues[revealedClueCount - 1] : '(No clue)'}</span>
+              {currentLive.clueImages && currentLive.clueImages[revealedClueCount - 1] && (
+                <span className="pill pill-blue" style={{ fontSize: '10px', padding: '2px 8px' }}>
+                  🖼️ Image Attached
+                </span>
+              )}
             </div>
             {isAnswerRevealed && (
               <div style={{ fontSize: '13px', color: 'var(--winner-gold)', fontWeight: 800, marginTop: '4px' }}>
@@ -129,12 +153,11 @@ export const QuestionManager = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            {/* Clue Advance Flow Button */}
             {revealedClueCount < 4 ? (
               <button
                 onClick={revealNextClue}
                 className="btn btn-primary btn-md pulsing-glow"
-                style={{ padding: '8px 20px', fontWeight: 800 }}
+                style={{ padding: '10px 22px', fontWeight: 800 }}
               >
                 🔍 Reveal Clue {revealedClueCount + 1}
               </button>
@@ -142,7 +165,7 @@ export const QuestionManager = () => {
               <button
                 onClick={() => revealAnswer(true)}
                 className="btn btn-warning btn-md pulsing-glow"
-                style={{ padding: '8px 22px', fontWeight: 900, color: '#000' }}
+                style={{ padding: '10px 24px', fontWeight: 900, color: '#000' }}
               >
                 🎉 Reveal Answer
               </button>
@@ -159,16 +182,15 @@ export const QuestionManager = () => {
               onClick={() => setActiveQuestion(Math.max(0, activeQuestionIndex - 1))}
               disabled={activeQuestionIndex === 0}
               className="btn btn-secondary btn-sm"
-              title="Previous challenge"
+              title="Previous Challenge"
             >
               ◀ Prev
             </button>
-
             <button
               onClick={() => setActiveQuestion(Math.min(questions.length - 1, activeQuestionIndex + 1))}
               disabled={activeQuestionIndex >= questions.length - 1}
               className="btn btn-secondary btn-sm"
-              title="Next challenge"
+              title="Next Challenge"
             >
               Next ▶
             </button>
@@ -176,30 +198,49 @@ export const QuestionManager = () => {
         </div>
       )}
 
-      {/* Challenges List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-        {questions.map((q, idx) => {
-          const isLive = idx === activeQuestionIndex;
-          const answerText = q.answer || (q.options ? q.options[q.correctOptionIndex || 0] : 'N/A');
+      {/* Challenge List */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {questions.length === 0 ? (
+          <div className="glass-card" style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '40px', marginBottom: '12px' }}>📝</div>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: '#FFFFFF', marginBottom: '6px' }}>
+              No Challenges In Bank
+            </div>
+            <p style={{ fontSize: '13px', marginBottom: '20px' }}>
+              Add a new challenge with 4 progressive clues and images or reset to 5 default sample questions.
+            </p>
+            <button onClick={resetToSampleQuestions} className="btn btn-primary">
+              Load 5 Sample Challenges
+            </button>
+          </div>
+        ) : (
+          questions.map((q, idx) => {
+            const isLive = idx === activeQuestionIndex;
+            const answerText = q.answer || (q.options && q.options[q.correctOptionIndex]) || 'NO ANSWER';
 
-          return (
-            <ChallengeCard
-              key={q.id || idx}
-              q={q}
-              idx={idx}
-              isLive={isLive}
-              answerText={answerText}
-              onSetActive={() => setActiveQuestion(idx)}
-              onMoveUp={() => handleMoveUp(idx)}
-              onMoveDown={() => handleMoveDown(idx)}
-              onEdit={() => handleOpenEdit(q)}
-              onDelete={() => deleteQuestion(q.id)}
-            />
-          );
-        })}
+            return (
+              <ChallengeCard
+                key={q.id || idx}
+                q={q}
+                idx={idx}
+                isLive={isLive}
+                answerText={answerText}
+                onSetActive={() => setActiveQuestion(idx)}
+                onMoveUp={() => handleMoveUp(idx)}
+                onMoveDown={() => handleMoveDown(idx)}
+                onEdit={() => handleOpenEdit(q)}
+                onDelete={() => {
+                  if (window.confirm(`Delete Challenge #${idx + 1}?`)) {
+                    deleteQuestion(q.id);
+                  }
+                }}
+              />
+            );
+          })
+        )}
       </div>
 
-      {/* Edit/Add Question Modal */}
+      {/* Edit/Add Question Modal with Clue Image Uploads */}
       {isModalOpen && editingQuestion && (
         <QuestionEditorModal
           question={editingQuestion}
@@ -211,7 +252,7 @@ export const QuestionManager = () => {
   );
 };
 
-// ─── Individual Challenge Card with progressive clue preview ───
+// ─── Challenge Card with Progressive Clue Preview & Images ───
 const ChallengeCard = ({ q, idx, isLive, answerText, onSetActive, onMoveUp, onMoveDown, onEdit, onDelete }) => {
   const [previewClue, setPreviewClue] = useState(1);
 
@@ -219,45 +260,58 @@ const ChallengeCard = ({ q, idx, isLive, answerText, onSetActive, onMoveUp, onMo
     ? q.clues.slice(0, 4)
     : [...(q.clues || []), '', '', '', ''].slice(0, 4);
 
+  const clueImages = q.clueImages && q.clueImages.length >= 4
+    ? q.clueImages.slice(0, 4)
+    : [...(q.clueImages || []), '', '', '', ''].slice(0, 4);
+
+  const activeImage = clueImages[previewClue - 1];
+  const imagesCount = clueImages.filter((img) => Boolean(img && img.trim())).length;
+
   return (
     <div
       className="glass-card"
       style={{
-        padding: '20px 24px',
-        border: isLive ? '1.5px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
-        background: isLive ? 'rgba(26, 39, 66, 0.75)' : 'var(--bg-card)',
+        padding: '24px 28px',
+        border: isLive ? '1.8px solid var(--accent-primary)' : '1px solid var(--border-glass)',
+        background: isLive ? 'rgba(26, 39, 66, 0.85)' : 'var(--bg-card)',
+        boxShadow: isLive ? '0 0 25px rgba(99, 102, 241, 0.25)' : 'var(--shadow-card)',
       }}
     >
       {/* Challenge Header & Actions */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span className={`pill ${isLive ? 'pill-purple' : 'pill-blue'}`} style={{ fontSize: '11px' }}>
-            #{idx + 1}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span className={`pill ${isLive ? 'pill-purple' : 'pill-blue'}`} style={{ fontSize: '12px', padding: '4px 12px' }}>
+            CHALLENGE #{idx + 1}
           </span>
-          <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-secondary)' }}>
-            4-Clue Challenge
+          <span style={{ fontSize: '15px', fontWeight: 800, color: '#FFFFFF' }}>
+            {q.question || '4-Clue Challenge'}
           </span>
+          {imagesCount > 0 && (
+            <span className="pill pill-blue" style={{ fontSize: '11px', padding: '3px 10px' }}>
+              🖼️ {imagesCount} {imagesCount === 1 ? 'Image' : 'Images'}
+            </span>
+          )}
           {isLive && (
-            <span className="pill pill-green" style={{ fontSize: '10px' }}>
-              ● LIVE STAGE
+            <span className="pill pill-green" style={{ fontSize: '10.5px' }}>
+              ● CURRENTLY LIVE
             </span>
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {!isLive && (
             <button
               onClick={onSetActive}
               className="btn btn-outline btn-sm"
-              style={{ color: 'var(--accent-cyan)', borderColor: 'rgba(56, 189, 248, 0.4)' }}
+              style={{ color: 'var(--accent-cyan)', borderColor: 'rgba(56, 189, 248, 0.5)', fontWeight: 800 }}
             >
               Broadcast Live
             </button>
           )}
-          <button onClick={onMoveUp} className="btn btn-secondary btn-sm" title="Move up">
+          <button onClick={onMoveUp} className="btn btn-secondary btn-sm" title="Move Up">
             ▲
           </button>
-          <button onClick={onMoveDown} className="btn btn-secondary btn-sm" title="Move down">
+          <button onClick={onMoveDown} className="btn btn-secondary btn-sm" title="Move Down">
             ▼
           </button>
           <button onClick={onEdit} className="btn btn-secondary btn-sm" title="Edit challenge">
@@ -269,91 +323,141 @@ const ChallengeCard = ({ q, idx, isLive, answerText, onSetActive, onMoveUp, onMo
         </div>
       </div>
 
-      {/* Progressive Clue Preview — shows one clue at a time with Next/Prev */}
+      {/* Progressive Clue Preview Box */}
       <div style={{
-        marginBottom: '14px',
-        padding: '16px 20px',
+        marginBottom: '16px',
+        padding: '18px 22px',
         borderRadius: 'var(--radius-md)',
-        background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.8) 100%)',
-        border: '1px solid rgba(99, 102, 241, 0.3)',
+        background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(30, 41, 59, 0.85) 100%)',
+        border: '1px solid rgba(99, 102, 241, 0.35)',
       }}>
-        {/* Clue Step Indicators */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
-          {[1, 2, 3, 4].map((num) => (
-            <button
-              key={num}
-              onClick={() => setPreviewClue(num)}
-              style={{
-                padding: '4px 12px',
-                borderRadius: '8px',
-                border: previewClue === num
-                  ? '1.5px solid var(--accent-cyan)'
-                  : '1px solid rgba(255, 255, 255, 0.1)',
-                background: previewClue === num
-                  ? 'linear-gradient(135deg, #0284C7 0%, #4F46E5 100%)'
-                  : 'rgba(255, 255, 255, 0.04)',
-                color: previewClue === num ? '#FFFFFF' : 'var(--text-muted)',
-                fontSize: '11px',
-                fontWeight: 800,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              CLUE {num}
-            </button>
-          ))}
+        {/* Step Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
+          {[1, 2, 3, 4].map((num) => {
+            const hasImg = Boolean(clueImages[num - 1] && clueImages[num - 1].trim());
+            return (
+              <button
+                key={num}
+                onClick={() => setPreviewClue(num)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '10px',
+                  border: previewClue === num
+                    ? '1.5px solid var(--accent-cyan)'
+                    : '1px solid rgba(255, 255, 255, 0.1)',
+                  background: previewClue === num
+                    ? 'linear-gradient(135deg, #0284C7 0%, #4F46E5 100%)'
+                    : 'rgba(255, 255, 255, 0.05)',
+                  color: previewClue === num ? '#FFFFFF' : 'var(--text-muted)',
+                  fontSize: '11.5px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <span>CLUE {num}</span>
+                {hasImg && <span style={{ fontSize: '11px' }}>🖼️</span>}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Active Clue Content */}
+        {/* Clue Text & Optional Image Container */}
         <div style={{
-          padding: '14px 18px',
-          borderRadius: '10px',
+          padding: '16px 20px',
+          borderRadius: '12px',
           background: 'rgba(255, 255, 255, 0.03)',
           border: '1px solid rgba(56, 189, 248, 0.2)',
-          minHeight: '50px',
           display: 'flex',
+          gap: '18px',
           alignItems: 'center',
-          gap: '14px',
+          flexWrap: 'wrap',
         }}>
           <div style={{
-            minWidth: '70px',
-            padding: '6px 10px',
-            borderRadius: '8px',
+            minWidth: '80px',
+            padding: '8px 12px',
+            borderRadius: '10px',
             background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
             textAlign: 'center',
+            flexShrink: 0,
           }}>
-            <span style={{ fontSize: '10px', fontWeight: 900, color: '#FFFFFF', letterSpacing: '0.1em' }}>
+            <span style={{ fontSize: '11px', fontWeight: 900, color: '#FFFFFF', letterSpacing: '0.1em' }}>
               CLUE #{previewClue}
             </span>
           </div>
-          <span style={{
-            fontSize: '14px',
-            color: '#FFFFFF',
-            fontWeight: 600,
-            lineHeight: 1.5,
-          }}>
-            {clues[previewClue - 1] || '(No clue entered)'}
-          </span>
+
+          <div style={{ flex: 1, minWidth: '220px' }}>
+            <div style={{
+              fontSize: '15px',
+              color: '#FFFFFF',
+              fontWeight: 600,
+              lineHeight: 1.5,
+            }}>
+              {clues[previewClue - 1] || '(No clue text entered)'}
+            </div>
+          </div>
+
+          {/* Clue Image Preview if present */}
+          {activeImage && (
+            <div style={{
+              flexShrink: 0,
+              position: 'relative',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              border: '2px solid rgba(56, 189, 248, 0.6)',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+            }}>
+              <img
+                src={activeImage}
+                alt={`Clue #${previewClue}`}
+                style={{
+                  width: '140px',
+                  height: '95px',
+                  objectFit: 'cover',
+                  display: 'block',
+                }}
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
+              <span style={{
+                position: 'absolute',
+                bottom: '4px',
+                right: '4px',
+                background: 'rgba(0, 0, 0, 0.75)',
+                color: '#38BDF8',
+                fontSize: '9.5px',
+                padding: '2px 6px',
+                borderRadius: '6px',
+                fontWeight: 800,
+              }}>
+                CLUE #{previewClue} IMG
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Next/Prev clue buttons */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+        {/* Next / Prev Navigation */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
           <button
             onClick={() => setPreviewClue(Math.max(1, previewClue - 1))}
             disabled={previewClue === 1}
             className="btn btn-secondary btn-sm"
-            style={{ fontSize: '11px', padding: '4px 14px' }}
+            style={{ fontSize: '11.5px', padding: '4px 14px' }}
           >
             ◀ Prev Clue
           </button>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 700 }}>
+          <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', fontWeight: 700 }}>
             {previewClue} / 4
           </span>
           <button
             onClick={() => setPreviewClue(Math.min(4, previewClue + 1))}
             disabled={previewClue === 4}
             className="btn btn-secondary btn-sm"
-            style={{ fontSize: '11px', padding: '4px 14px' }}
+            style={{ fontSize: '11.5px', padding: '4px 14px' }}
           >
             Next Clue ▶
           </button>
@@ -364,29 +468,36 @@ const ChallengeCard = ({ q, idx, isLive, answerText, onSetActive, onMoveUp, onMo
       <div style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: '8px',
-        padding: '6px 14px',
-        borderRadius: '8px',
+        gap: '10px',
+        padding: '8px 18px',
+        borderRadius: '10px',
         background: 'rgba(251, 191, 36, 0.12)',
-        border: '1px solid rgba(251, 191, 36, 0.4)',
-        fontSize: '13px',
+        border: '1.5px solid rgba(251, 191, 36, 0.45)',
+        fontSize: '13.5px',
         fontWeight: 800,
         color: 'var(--winner-gold)',
       }}>
         <span>🏆 FINAL ANSWER:</span>
-        <span style={{ color: '#FFFFFF' }}>{answerText}</span>
+        <span style={{ color: '#FFFFFF', letterSpacing: '0.04em' }}>{answerText}</span>
       </div>
     </div>
   );
 };
 
-// ─── Editor Modal (No question prompt — only 4 clues + answer) ───
+// ─── Modal Editor with 4 Clues + Image URL / File Upload for Each ───
 const QuestionEditorModal = ({ question, onSave, onClose }) => {
   const [clues, setClues] = useState(
     question.clues && question.clues.length >= 4
       ? [...question.clues]
       : [...(question.clues || []), '', '', '', ''].slice(0, 4)
   );
+
+  const [clueImages, setClueImages] = useState(
+    question.clueImages && question.clueImages.length >= 4
+      ? [...question.clueImages]
+      : [...(question.clueImages || []), '', '', '', ''].slice(0, 4)
+  );
+
   const [answer, setAnswer] = useState(
     question.answer || (question.options ? question.options[question.correctOptionIndex || 0] : '')
   );
@@ -395,6 +506,23 @@ const QuestionEditorModal = ({ question, onSave, onClose }) => {
     const updated = [...clues];
     updated[index] = value;
     setClues(updated);
+  };
+
+  const handleImageChange = (index, value) => {
+    const updated = [...clueImages];
+    updated[index] = value;
+    setClueImages(updated);
+  };
+
+  // Allow uploading an image directly from PC
+  const handleFileUpload = (index, file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target.result;
+      handleImageChange(index, dataUrl);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = (e) => {
@@ -406,6 +534,7 @@ const QuestionEditorModal = ({ question, onSave, onClose }) => {
       ...question,
       question: '4-Clue Challenge',
       clues: clues.map((c) => c.trim()),
+      clueImages: clueImages.map((img) => (img || '').trim()),
       answer: answer.trim(),
     });
   };
@@ -414,8 +543,9 @@ const QuestionEditorModal = ({ question, onSave, onClose }) => {
     <div style={{
       position: 'fixed',
       inset: 0,
-      background: 'rgba(0, 0, 0, 0.78)',
-      backdropFilter: 'blur(8px)',
+      background: 'rgba(0, 0, 0, 0.82)',
+      backdropFilter: 'blur(10px)',
+      WebkitBackdropFilter: 'blur(10px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -423,66 +553,184 @@ const QuestionEditorModal = ({ question, onSave, onClose }) => {
       padding: '20px',
     }}>
       <div className="glass-card" style={{
-        maxWidth: '680px',
+        maxWidth: '780px',
         width: '100%',
-        maxHeight: '90vh',
+        maxHeight: '92vh',
         overflowY: 'auto',
-        padding: '32px',
-        border: '1.5px solid rgba(99, 102, 241, 0.4)',
-        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8)',
+        padding: '36px',
+        border: '1.5px solid rgba(99, 102, 241, 0.45)',
+        boxShadow: '0 25px 70px rgba(0, 0, 0, 0.85)',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h3 style={{ fontSize: '18px', fontWeight: 900 }}>
-            {question.id ? '✏️ Edit 4-Clue Challenge' : '➕ Create 4-Clue Challenge'}
-          </h3>
-          <button onClick={onClose} className="btn btn-secondary btn-sm" style={{ padding: '4px 10px' }}>
-            ✕
+        {/* Modal Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px' }}>
+          <div>
+            <h3 style={{ fontSize: '20px', fontWeight: 900 }}>
+              {question.id ? '✏️ Edit 4-Clue Challenge' : '➕ Create 4-Clue Challenge'}
+            </h3>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              Add text and optional image for each progressive clue (Clue 1 → Clue 4).
+            </p>
+          </div>
+          <button onClick={onClose} className="btn btn-secondary btn-sm" style={{ padding: '6px 12px' }}>
+            ✕ Close
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 800, color: 'var(--accent-cyan)' }}>
-              4 PROGRESSIVE CLUES (Clue 1 → Clue 4)
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* 4 Clues Inputs (Text + Image for each) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <label style={{ fontSize: '13px', fontWeight: 800, color: 'var(--accent-cyan)', letterSpacing: '0.08em' }}>
+              4 PROGRESSIVE CLUES WITH OPTIONAL IMAGES
             </label>
-            {clues.map((c, idx) => (
-              <div key={idx}>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' }}>
-                  CLUE #{idx + 1} {idx === 0 ? '(Hardest / 1st Reveal)' : idx === 3 ? '(Giveaway Clue)' : ''}
+
+            {[0, 1, 2, 3].map((idx) => {
+              const clueNum = idx + 1;
+              const hasImage = Boolean(clueImages[idx] && clueImages[idx].trim());
+
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    padding: '16px 18px',
+                    borderRadius: '14px',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="pill pill-blue" style={{ fontSize: '10.5px', padding: '2px 8px' }}>
+                        CLUE #{clueNum}
+                      </span>
+                      <span>{idx === 0 ? '(Hardest / 1st Reveal)' : idx === 3 ? '(Final Giveaway Clue)' : `(Step ${clueNum})`}</span>
+                    </div>
+
+                    {hasImage && (
+                      <button
+                        type="button"
+                        onClick={() => handleImageChange(idx, '')}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--status-red)',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ✕ Remove Image
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Clue Text Input */}
+                  <textarea
+                    rows={2}
+                    value={clues[idx]}
+                    onChange={(e) => handleClueChange(idx, e.target.value)}
+                    placeholder={`Enter Clue #${clueNum} text description...`}
+                    className="input-field"
+                    style={{ width: '100%', resize: 'vertical', minHeight: '60px' }}
+                    required={idx === 0}
+                  />
+
+                  {/* Clue Image Section: URL + File Upload */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    flexWrap: 'wrap',
+                    padding: '10px 14px',
+                    borderRadius: '10px',
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    border: '1px solid rgba(255, 255, 255, 0.06)',
+                  }}>
+                    <span style={{ fontSize: '14px' }}>🖼️</span>
+
+                    {/* Image URL input */}
+                    <input
+                      type="url"
+                      value={clueImages[idx] || ''}
+                      onChange={(e) => handleImageChange(idx, e.target.value)}
+                      placeholder="Paste Image URL (https://...)..."
+                      className="input-field"
+                      style={{ flex: 1, minWidth: '220px', padding: '8px 12px', fontSize: '12.5px' }}
+                    />
+
+                    {/* Or File Upload */}
+                    <label
+                      className="btn btn-secondary btn-sm"
+                      style={{ padding: '8px 14px', cursor: 'pointer', fontSize: '11px', whiteSpace: 'nowrap' }}
+                    >
+                      📁 Upload File
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            handleFileUpload(idx, e.target.files[0]);
+                          }
+                        }}
+                      />
+                    </label>
+
+                    {/* Live Image Thumbnail Preview */}
+                    {hasImage && (
+                      <div style={{
+                        width: '54px',
+                        height: '42px',
+                        borderRadius: '6px',
+                        overflow: 'hidden',
+                        border: '1.5px solid var(--accent-cyan)',
+                        flexShrink: 0,
+                      }}>
+                        <img
+                          src={clueImages[idx]}
+                          alt={`Preview #${clueNum}`}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <input
-                  type="text"
-                  value={c}
-                  onChange={(e) => handleClueChange(idx, e.target.value)}
-                  placeholder={`Enter Clue #${idx + 1}...`}
-                  className="input-field"
-                  required
-                  style={{ width: '100%' }}
-                />
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          <div>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: 800, color: 'var(--winner-gold)', marginBottom: '6px' }}>
+          {/* Final Answer Input */}
+          <div style={{
+            padding: '18px 20px',
+            borderRadius: '14px',
+            background: 'rgba(251, 191, 36, 0.08)',
+            border: '1.5px solid rgba(251, 191, 36, 0.4)',
+          }}>
+            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 900, color: 'var(--winner-gold)', marginBottom: '8px' }}>
               🏆 FINAL MYSTERY ANSWER (Revealed on Final Step)
             </label>
             <input
               type="text"
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
-              placeholder="e.g. GOOGLE"
+              placeholder="e.g. JUPITER, GOOGLE, TAJ MAHAL"
               className="input-field"
               required
-              style={{ width: '100%', borderColor: 'rgba(251, 191, 36, 0.5)' }}
+              style={{ width: '100%', borderColor: 'rgba(251, 191, 36, 0.6)', fontWeight: 800, fontSize: '16px' }}
             />
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
+          {/* Modal Footer Buttons */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
             <button type="button" onClick={onClose} className="btn btn-secondary">
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary">
+            <button type="submit" className="btn btn-primary" style={{ padding: '12px 30px', fontWeight: 800 }}>
               Save Challenge
             </button>
           </div>

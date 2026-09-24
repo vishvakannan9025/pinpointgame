@@ -23,6 +23,9 @@ export const ProjectorStageView = () => {
   // BY DEFAULT: Question occupies the entire screen; buzzer list is hidden until button is pressed
   const [showBuzzerList, setShowBuzzerList] = useState(false);
 
+  // Fullscreen Clue Image Lightbox State
+  const [fullscreenImage, setFullscreenImage] = useState(null); // { url, clueNumber, clueText }
+
   // Sync fullscreen state with browser events (e.g. user presses ESC to exit)
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -81,6 +84,13 @@ export const ProjectorStageView = () => {
         'No clue provided.',
       ].slice(0, 4);
 
+  const clueImages = currentQ.clueImages && currentQ.clueImages.length >= 4
+    ? currentQ.clueImages.slice(0, 4)
+    : [
+        ...(currentQ.clueImages || []),
+        '', '', '', '',
+      ].slice(0, 4);
+
   const answer = currentQ.answer || (currentQ.options && currentQ.options[currentQ.correctOptionIndex]) || 'REVEALED';
 
   const queue = room ? room.buzzQueue || [] : [];
@@ -127,12 +137,17 @@ export const ProjectorStageView = () => {
       } else if (e.code === 'KeyR' || e.key === 'r' || e.key === 'R') {
         e.preventDefault();
         resetClues();
+      } else if (e.key === 'Escape') {
+        if (fullscreenImage) {
+          e.preventDefault();
+          setFullscreenImage(null);
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleProgressiveAction, activeQuestionIndex, setActiveQuestion, resetClues]);
+  }, [handleProgressiveAction, activeQuestionIndex, setActiveQuestion, resetClues, fullscreenImage]);
 
   const handlePrevQuestion = () => {
     if (activeQuestionIndex > 0) {
@@ -458,8 +473,64 @@ export const ProjectorStageView = () => {
                     )}
                   </div>
 
+                  {/* Clue Visual Image if revealed & present */}
+                  {isRevealed && clueImages[idx] && (
+                    <div
+                      onClick={() => setFullscreenImage({
+                        url: clueImages[idx],
+                        clueNumber,
+                        clueText,
+                      })}
+                      style={{
+                        position: 'relative',
+                        borderRadius: '14px',
+                        overflow: 'hidden',
+                        border: isCurrentActive ? '2.5px solid var(--accent-cyan)' : '2px solid rgba(56, 189, 248, 0.6)',
+                        boxShadow: isCurrentActive
+                          ? '0 8px 30px rgba(56, 189, 248, 0.35), 0 0 20px rgba(0, 0, 0, 0.6)'
+                          : '0 6px 20px rgba(0, 0, 0, 0.5)',
+                        flexShrink: 0,
+                        cursor: 'zoom-in',
+                        animation: 'fadeIn 0.4s ease',
+                        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                      }}
+                      title="Click to view full screen image"
+                    >
+                      <img
+                        src={clueImages[idx]}
+                        alt={`Clue #${clueNumber} Visual`}
+                        style={{
+                          width: isCurrentActive ? (isFullscreen ? '260px' : '200px') : (isFullscreen ? '180px' : '140px'),
+                          height: isCurrentActive ? (isFullscreen ? '170px' : '130px') : (isFullscreen ? '115px' : '90px'),
+                          objectFit: 'cover',
+                          display: 'block',
+                        }}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                      <div style={{
+                        position: 'absolute',
+                        bottom: '4px',
+                        right: '4px',
+                        background: 'rgba(0, 0, 0, 0.82)',
+                        color: 'var(--accent-cyan)',
+                        padding: '2px 7px',
+                        borderRadius: '6px',
+                        fontSize: '9.5px',
+                        fontWeight: 900,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        border: '1px solid rgba(56, 189, 248, 0.4)',
+                      }}>
+                        <span>⛶</span> FULLSCREEN
+                      </div>
+                    </div>
+                  )}
+
                   {/* Status Indicator Icon */}
-                  <div style={{ fontSize: isFullscreen ? '26px' : '22px' }}>
+                  <div style={{ fontSize: isFullscreen ? '26px' : '22px', flexShrink: 0 }}>
                     {isRevealed ? '💡' : '🔒'}
                   </div>
                 </div>
@@ -803,6 +874,124 @@ export const ProjectorStageView = () => {
           </aside>
         )}
       </div>
+
+      {/* ─── FULLSCREEN CLUE IMAGE LIGHTBOX OVERLAY ─── */}
+      {fullscreenImage && (
+        <div
+          onClick={() => setFullscreenImage(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(3, 7, 18, 0.96)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            zIndex: 99999999,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            animation: 'fadeIn 0.25s ease',
+            cursor: 'zoom-out',
+          }}
+        >
+          {/* Lightbox Top Header Bar */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '72px',
+              padding: '0 32px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'rgba(11, 17, 32, 0.92)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
+              boxShadow: '0 4px 25px rgba(0, 0, 0, 0.5)',
+              zIndex: 30,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', maxWidth: 'calc(100% - 240px)' }}>
+              <span className="pill pill-blue" style={{ fontSize: '13px', padding: '6px 16px', fontWeight: 900, flexShrink: 0 }}>
+                CLUE #{fullscreenImage.clueNumber} IMAGE
+              </span>
+              <span style={{
+                color: '#FFFFFF',
+                fontSize: '15px',
+                fontWeight: 700,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>
+                {fullscreenImage.clueText}
+              </span>
+            </div>
+
+            <button
+              onClick={() => setFullscreenImage(null)}
+              className="btn btn-secondary"
+              style={{
+                padding: '10px 22px',
+                fontSize: '13px',
+                fontWeight: 900,
+                borderRadius: '12px',
+                background: 'rgba(30, 41, 59, 0.95)',
+                border: '1.5px solid rgba(255, 255, 255, 0.25)',
+                color: '#FFFFFF',
+                flexShrink: 0,
+              }}
+            >
+              ✕ Exit Fullscreen (Esc)
+            </button>
+          </div>
+
+          {/* Full Resolution Image Container */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              marginTop: '55px',
+              maxWidth: '92vw',
+              maxHeight: 'calc(100vh - 140px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '24px',
+              overflow: 'hidden',
+              border: '3px solid rgba(56, 189, 248, 0.75)',
+              boxShadow: '0 0 70px rgba(56, 189, 248, 0.35), 0 30px 90px rgba(0, 0, 0, 0.95)',
+              background: '#0B1120',
+            }}
+          >
+            <img
+              src={fullscreenImage.url}
+              alt={`Clue #${fullscreenImage.clueNumber} Fullscreen`}
+              style={{
+                maxWidth: '92vw',
+                maxHeight: 'calc(100vh - 140px)',
+                width: 'auto',
+                height: 'auto',
+                objectFit: 'contain',
+                display: 'block',
+              }}
+            />
+          </div>
+
+          <div style={{
+            position: 'absolute',
+            bottom: '18px',
+            fontSize: '12.5px',
+            color: 'var(--text-muted)',
+            letterSpacing: '0.04em',
+          }}>
+            Click anywhere or press [Esc] to exit image view
+          </div>
+        </div>
+      )}
     </div>
   );
 };
