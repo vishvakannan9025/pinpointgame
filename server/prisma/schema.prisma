@@ -1,0 +1,61 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum RoomStatus {
+  WAITING
+  ACTIVE
+  LOCKED
+  CLOSED
+}
+
+model Room {
+  id                    String        @id @default(uuid())
+  roomCode              String        @unique
+  status                RoomStatus    @default(WAITING)
+  currentRound          Int           @default(1)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  participants          Participant[]
+  buzzerEvents          BuzzerEvent[]
+  roundHistories        RoundHistory[]
+}
+
+model Participant {
+  id               String        @id @default(uuid())
+  roomId           String
+  room             Room          @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  teamName         String
+  connectionStatus Boolean       @default(true)
+  joinedAt         DateTime      @default(now())
+  buzzerEvents     BuzzerEvent[]
+  roundWins        RoundHistory[]
+
+  @@unique([roomId, teamName])
+}
+
+model BuzzerEvent {
+  id               String      @id @default(uuid())
+  roomId           String
+  room             Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  participantId    String
+  participant      Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  roundNumber      Int
+  serverReceivedAt DateTime    @default(now())
+  isWinner         Boolean     @default(false)
+}
+
+model RoundHistory {
+  id               String      @id @default(uuid())
+  roomId           String
+  room             Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  roundNumber      Int
+  winningTeamId    String
+  winningTeam      Participant @relation(fields: [winningTeamId], references: [id], onDelete: Cascade)
+  serverTimestamp  DateTime    @default(now())
+}

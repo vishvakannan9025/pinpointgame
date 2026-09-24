@@ -1,0 +1,349 @@
+/* ==========================================================================
+   PinPoint Game — Website Admin Portal Global CSS & Design Tokens
+   ========================================================================== */
+
+:root {
+  --bg-dark: #080C15;
+  --bg-surface: #0E1524;
+  --bg-card: #141E33;
+  --bg-card-hover: #1A2742;
+  --bg-elevated: #1F2E4D;
+  --bg-input: #0B111D;
+
+  --text-primary: #FFFFFF;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+
+  --accent-primary: #6366F1;
+  --accent-primary-hover: #4F46E5;
+  --accent-primary-glow: rgba(99, 102, 241, 0.35);
+
+  --accent-cyan: #38BDF8;
+  --accent-cyan-glow: rgba(56, 189, 248, 0.3);
+
+  --status-green: #10B981;
+  --status-green-glow: rgba(16, 185, 129, 0.35);
+
+  --status-amber: #F59E0B;
+  --status-amber-glow: rgba(245, 158, 11, 0.3);
+
+  --status-red: #EF4444;
+  --status-red-glow: rgba(239, 68, 68, 0.35);
+
+  --winner-gold: #FBBF24;
+  --winner-gold-glow: rgba(251, 191, 36, 0.4);
+
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-focus: rgba(99, 102, 241, 0.6);
+
+  --font-heading: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  --shadow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 25px var(--accent-primary-glow);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  color: var(--text-primary);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-dark);
+}
+::-webkit-scrollbar-thumb {
+  background: #25334D;
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3B4E70;
+}
+
+/* Utilities */
+.app-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1;
+  max-width: 1280px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 24px 20px 48px 20px;
+}
+
+/* Glassmorphism Card */
+.glass-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(12px);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease-in-out;
+  outline: none;
+  user-select: none;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background: var(--accent-primary);
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px var(--accent-primary-glow);
+}
+.btn-primary:hover {
+  background: var(--accent-primary-hover);
+  box-shadow: 0 6px 20px var(--accent-primary-glow);
+}
+
+.btn-success {
+  background: var(--status-green);
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px var(--status-green-glow);
+}
+.btn-success:hover {
+  background: #059669;
+  box-shadow: 0 6px 20px var(--status-green-glow);
+}
+
+.btn-warning {
+  background: var(--status-amber);
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px var(--status-amber-glow);
+}
+.btn-warning:hover {
+  background: #D97706;
+}
+
+.btn-danger {
+  background: var(--status-red);
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px var(--status-red-glow);
+}
+.btn-danger:hover {
+  background: #DC2626;
+}
+
+.btn-secondary {
+  background: #2A364F;
+  color: #E2E8F0;
+  border: 1px solid var(--border-subtle);
+}
+.btn-secondary:hover {
+  background: #374665;
+  color: #FFFFFF;
+}
+
+.btn-outline {
+  background: transparent;
+  color: #CBD5E1;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.btn-outline:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #FFFFFF;
+}
+
+.btn-lg {
+  padding: 14px 26px;
+  font-size: 14px;
+  border-radius: var(--radius-lg);
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 11.5px;
+  border-radius: var(--radius-sm);
+}
+
+/* Badges & Pills */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.pill-green {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--status-green);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.pill-amber {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--status-amber);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.pill-red {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--status-red);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.pill-blue {
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+}
+
+.pill-purple {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--accent-primary);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+}
+
+/* Inputs */
+.input-field {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input-field:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--accent-primary-glow);
+}
+
+/* Pulse Animation */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 15px var(--status-green-glow);
+  }
+  50% {
+    box-shadow: 0 0 30px var(--status-green-glow);
+  }
+}
+
+.pulsing-green {
+  animation: pulse-glow 2s infinite ease-in-out;
+}
+
+/* ==========================================================================
+   Projector Fullscreen Stage & Side Drawer Styles
+   ========================================================================== */
+
+.projector-fullscreen-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.projector-fullscreen-container.is-fullscreen {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  z-index: 999999 !important;
+  background: radial-gradient(circle at 50% 15%, #0F172A 0%, #030712 100%) !important;
+  padding: 24px 32px !important;
+  margin: 0 !important;
+  overflow-y: auto !important;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.buzzer-side-drawer {
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes goldPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 25px rgba(251, 191, 36, 0.8);
+  }
+}
+
+.pulsing-gold-badge {
+  animation: goldPulse 1.8s infinite ease-in-out;
+}
+
