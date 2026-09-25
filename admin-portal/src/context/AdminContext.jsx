@@ -53,8 +53,8 @@ export const AdminProvider = ({ children }) => {
             localStorage.setItem('pinpoint_questions', JSON.stringify(defaultForRound));
             return defaultForRound;
           }
-          // If Round 2 has old demo questions or doesn't match ROUND_2_QUESTIONS length, refresh!
-          if (currentRoundNum === 2 && (parsed.some(q => q.id?.includes('demo') || q.category?.includes('Demo 1')) || parsed.length !== ROUND_2_QUESTIONS.length)) {
+          // If Round 2 has old demo questions or doesn't have updated lyrics roles, refresh!
+          if (currentRoundNum === 2 && (parsed.some(q => q.id?.includes('demo') || q.category?.includes('Demo 1')) || parsed.length !== ROUND_2_QUESTIONS.length || !parsed.some(q => q.clues?.some(c => c.includes('Agan'))))) {
             localStorage.setItem('pinpoint_questions', JSON.stringify(defaultForRound));
             return defaultForRound;
           }

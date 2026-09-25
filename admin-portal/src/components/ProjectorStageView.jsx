@@ -177,32 +177,51 @@ export const ProjectorStageView = () => {
   const winner = queue.length > 0 ? queue[0] : null;
   const isActive = room ? room.roundStatus === 'ACTIVE' : false;
 
-  // Auto-close lightbox whenever question changes or answer is revealed
+  // Keep fullscreen lightbox in sync with live stage clues and answer while open!
   useEffect(() => {
-    setFullscreenImage(null);
-  }, [activeQuestionIndex, isAnswerRevealed]);
+    setFullscreenImage((prev) => {
+      if (!prev) return null; // If lightbox is not open, keep it closed!
+      if (categoryTitleActive) return null; // Close if entering category title slide
 
-  // Toggle expand image manually with Key 'X' or button click (never auto-expands on next clue)
+      if (isAnswerRevealed) {
+        return {
+          url: currentQ.answerImage || '',
+          clueNumber: 'Answer',
+          clueText: answer,
+        };
+      }
+
+      if (revealedClueCount > 0) {
+        const idx = Math.min(revealedClueCount - 1, totalClues - 1);
+        return {
+          url: clueImages[idx] || '',
+          clueNumber: idx + 1,
+          clueText: clues[idx] || '',
+        };
+      }
+
+      return prev;
+    });
+  }, [revealedClueCount, isAnswerRevealed, activeQuestionIndex, categoryTitleActive, currentQ, answer, clueImages, clues, totalClues]);
+
+  // Toggle expand image manually with Key 'X' or button click
   const toggleExpandImage = useCallback(() => {
     setFullscreenImage((prev) => {
       if (prev) return null;
-      if (isAnswerRevealed && currentQ.answerImage) {
+      if (isAnswerRevealed) {
         return {
-          url: currentQ.answerImage,
+          url: currentQ.answerImage || '',
           clueNumber: 'Answer',
           clueText: answer,
         };
       }
       if (revealedClueCount > 0 && revealedClueCount <= totalClues) {
         const latestClueIndex = revealedClueCount - 1;
-        const latestClueImage = clueImages[latestClueIndex];
-        if (latestClueImage) {
-          return {
-            url: latestClueImage,
-            clueNumber: revealedClueCount,
-            clueText: clues[latestClueIndex],
-          };
-        }
+        return {
+          url: clueImages[latestClueIndex] || '',
+          clueNumber: revealedClueCount,
+          clueText: clues[latestClueIndex] || '',
+        };
       }
       return null;
     });
@@ -219,10 +238,9 @@ export const ProjectorStageView = () => {
     if (revealedClueCount < totalClues) {
       revealNextClue();
     } else if (!isAnswerRevealed) {
-      setFullscreenImage(null);
       revealAnswer(true);
+      // Keeps lightbox open if already open!
     } else {
-      setFullscreenImage(null);
       if (activeQuestionIndex < questions.length - 1) {
         const nextIndex = activeQuestionIndex + 1;
         const currentCat = questions[activeQuestionIndex]?.category;
@@ -231,6 +249,7 @@ export const ProjectorStageView = () => {
         if (currentCat !== nextCat) {
           // Entering a new category! Automatically show the Category Title Cover Slide
           setCategoryTitleActive(true);
+          setFullscreenImage(null);
         }
       }
     }
@@ -244,22 +263,36 @@ export const ProjectorStageView = () => {
   }, [setActiveQuestion, resetClues]);
 
   const handlePrevQuestion = useCallback(() => {
-    setCategoryTitleActive(false);
-    setFullscreenImage(null);
     if (activeQuestionIndex > 0) {
-      setActiveQuestion(activeQuestionIndex - 1);
+      const prevIndex = activeQuestionIndex - 1;
+      const currentCat = questions[activeQuestionIndex]?.category;
+      const prevCat = questions[prevIndex]?.category;
+      setActiveQuestion(prevIndex);
       resetClues();
+      if (currentCat !== prevCat) {
+        setCategoryTitleActive(true);
+        setFullscreenImage(null);
+      } else {
+        setCategoryTitleActive(false);
+      }
     }
-  }, [activeQuestionIndex, setActiveQuestion, resetClues]);
+  }, [activeQuestionIndex, questions, setActiveQuestion, resetClues]);
 
   const handleNextQuestion = useCallback(() => {
-    setCategoryTitleActive(false);
-    setFullscreenImage(null);
     if (activeQuestionIndex < questions.length - 1) {
-      setActiveQuestion(activeQuestionIndex + 1);
+      const nextIndex = activeQuestionIndex + 1;
+      const currentCat = questions[activeQuestionIndex]?.category;
+      const nextCat = questions[nextIndex]?.category;
+      setActiveQuestion(nextIndex);
       resetClues();
+      if (currentCat !== nextCat) {
+        setCategoryTitleActive(true);
+        setFullscreenImage(null);
+      } else {
+        setCategoryTitleActive(false);
+      }
     }
-  }, [activeQuestionIndex, questions.length, setActiveQuestion, resetClues]);
+  }, [activeQuestionIndex, questions, setActiveQuestion, resetClues]);
 
   // Keyboard shortcuts:
   // Space / ArrowRight: Next clue / reveal answer / dismiss title slide
@@ -1912,16 +1945,20 @@ export const ProjectorStageView = () => {
                 ROUND {activeRound} • CHALLENGE #{activeQuestionIndex + 1}
               </span>
               <span style={{
-                background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
-                color: '#FFFFFF',
+                background: fullscreenImage.clueNumber === 'Answer'
+                  ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
+                  : 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+                color: fullscreenImage.clueNumber === 'Answer' ? '#000000' : '#FFFFFF',
                 padding: '5px 14px',
                 borderRadius: '8px',
                 fontSize: '12.5px',
                 fontWeight: 900,
                 letterSpacing: '0.1em',
-                boxShadow: '0 2px 10px rgba(2, 132, 199, 0.4)',
+                boxShadow: fullscreenImage.clueNumber === 'Answer'
+                  ? '0 2px 10px rgba(245, 158, 11, 0.4)'
+                  : '0 2px 10px rgba(2, 132, 199, 0.4)',
               }}>
-                CLUE #{fullscreenImage.clueNumber}
+                {fullscreenImage.clueNumber === 'Answer' ? '🏆 FINAL ANSWER' : `CLUE #${fullscreenImage.clueNumber}`}
               </span>
             </div>
 
@@ -2082,17 +2119,17 @@ export const ProjectorStageView = () => {
                   fontSize: '14px',
                   fontWeight: 900,
                   letterSpacing: '0.18em',
-                  color: 'var(--accent-cyan)',
+                  color: fullscreenImage.clueNumber === 'Answer' ? 'var(--winner-gold)' : 'var(--accent-cyan)',
                   marginBottom: '18px',
                 }}>
-                  ✨ CLUE #{fullscreenImage.clueNumber} OF 4
+                  {fullscreenImage.clueNumber === 'Answer' ? '🏆 FINAL ANSWER' : `✨ CLUE #${fullscreenImage.clueNumber} OF ${totalClues}`}
                 </div>
                 <div style={{
-                  fontSize: '32px',
-                  fontWeight: 800,
+                  fontSize: isFullscreen ? (fullscreenImage.clueNumber === 'Answer' ? '46px' : '34px') : '28px',
+                  fontWeight: 900,
                   color: '#FFFFFF',
                   lineHeight: 1.55,
-                  textShadow: '0 4px 20px rgba(0, 0, 0, 0.9)',
+                  textShadow: fullscreenImage.clueNumber === 'Answer' ? '0 0 30px rgba(251, 191, 36, 0.8)' : '0 4px 20px rgba(0, 0, 0, 0.9)',
                   whiteSpace: 'pre-line',
                 }}>
                   {fullscreenImage.clueText}
@@ -2250,6 +2287,81 @@ export const ProjectorStageView = () => {
             </div>
           )}
 
+          {/* Floating Left Arrow: Previous Challenge */}
+          {activeQuestionIndex > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePrevQuestion();
+              }}
+              style={{
+                position: 'absolute',
+                left: '24px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                zIndex: 35,
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                background: 'rgba(15, 23, 42, 0.78)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                border: '1.5px solid rgba(255, 255, 255, 0.25)',
+                color: '#FFFFFF',
+                fontSize: '22px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.6)',
+                transition: 'all 0.2s ease',
+              }}
+              title="Previous Challenge (←)"
+            >
+              ◀
+            </button>
+          )}
+
+          {/* Floating Right Arrow: Progressive Navigation (Next Clue -> Answer -> Next Challenge) */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleProgressiveAction();
+            }}
+            className="pulsing-glow"
+            style={{
+              position: 'absolute',
+              right: '24px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 35,
+              width: '60px',
+              height: '60px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.88) 0%, rgba(79, 70, 229, 0.88) 100%)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              border: '2px solid rgba(56, 189, 248, 0.75)',
+              color: '#FFFFFF',
+              fontSize: '26px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 8px 32px rgba(2, 132, 199, 0.6)',
+              transition: 'all 0.2s ease',
+            }}
+            title={
+              revealedClueCount < totalClues && !isAnswerRevealed
+                ? `Next Clue (${revealedClueCount + 1}/${totalClues}) (→ / Space)`
+                : !isAnswerRevealed
+                ? 'Reveal Final Answer (→ / Space)'
+                : 'Next Challenge (→ / Space)'
+            }
+          >
+            ▶
+          </button>
+
           {/* Bottom Clue Text & Action Buttons Overlay — gradient fades up from the bottom */}
           <div
             onClick={(e) => e.stopPropagation()}
@@ -2271,8 +2383,10 @@ export const ProjectorStageView = () => {
             {/* Clue Number Badge & Clue Text */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: '320px' }}>
               <span style={{
-                background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
-                color: '#FFFFFF',
+                background: fullscreenImage.clueNumber === 'Answer'
+                  ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
+                  : 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+                color: fullscreenImage.clueNumber === 'Answer' ? '#000000' : '#FFFFFF',
                 padding: '8px 18px',
                 borderRadius: '10px',
                 fontSize: '14px',
@@ -2280,9 +2394,11 @@ export const ProjectorStageView = () => {
                 letterSpacing: '0.12em',
                 flexShrink: 0,
                 border: '1px solid rgba(255, 255, 255, 0.25)',
-                boxShadow: '0 4px 15px rgba(3, 105, 161, 0.5)',
+                boxShadow: fullscreenImage.clueNumber === 'Answer'
+                  ? '0 4px 15px rgba(245, 158, 11, 0.5)'
+                  : '0 4px 15px rgba(3, 105, 161, 0.5)',
               }}>
-                CLUE #{fullscreenImage.clueNumber}
+                {fullscreenImage.clueNumber === 'Answer' ? '🏆 FINAL ANSWER' : `CLUE #${fullscreenImage.clueNumber}`}
               </span>
               <span style={{
                 color: '#FFFFFF',
@@ -2297,7 +2413,7 @@ export const ProjectorStageView = () => {
 
             {/* Direct Stage Control Buttons Inside Lightbox */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              {revealedClueCount < 4 ? (
+              {revealedClueCount < totalClues && !isAnswerRevealed ? (
                 <button
                   onClick={() => {
                     revealNextClue();
@@ -2314,37 +2430,64 @@ export const ProjectorStageView = () => {
                     gap: '8px',
                     cursor: 'pointer',
                   }}
-                  title="Reveal next clue (Space)"
+                  title="Reveal next clue (Space or →)"
                 >
-                  <span>🔍 Next Clue ({revealedClueCount + 1}/4)</span>
-                  <span style={{ fontSize: '10px', opacity: 0.85, background: 'rgba(0,0,0,0.35)', padding: '2px 6px', borderRadius: '4px' }}>Space</span>
+                  <span>🔍 Next Clue ({revealedClueCount + 1}/{totalClues})</span>
+                  <span style={{ fontSize: '10px', opacity: 0.85, background: 'rgba(0,0,0,0.35)', padding: '2px 6px', borderRadius: '4px' }}>Space / →</span>
                 </button>
               ) : null}
 
-              <button
-                onClick={() => {
-                  setFullscreenImage(null);
-                  revealAnswer(true);
-                }}
-                className="btn btn-warning pulsing-glow"
-                style={{
-                  padding: '10px 24px',
-                  fontSize: '14px',
-                  fontWeight: 900,
-                  borderRadius: '10px',
-                  background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-                  color: '#000000',
-                  boxShadow: '0 4px 20px rgba(245, 158, 11, 0.45)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  cursor: 'pointer',
-                }}
-                title="Reveal Final Answer (Key A)"
-              >
-                <span>🎉 Reveal Final Answer</span>
-                <span style={{ fontSize: '10px', opacity: 0.9, background: 'rgba(0,0,0,0.35)', color: '#FFFFFF', padding: '2px 6px', borderRadius: '4px' }}>Key A</span>
-              </button>
+              {!isAnswerRevealed ? (
+                <button
+                  onClick={() => {
+                    revealAnswer(true);
+                  }}
+                  className="btn btn-warning pulsing-glow"
+                  style={{
+                    padding: '10px 24px',
+                    fontSize: '14px',
+                    fontWeight: 900,
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                    color: '#000000',
+                    boxShadow: '0 4px 20px rgba(245, 158, 11, 0.45)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                  }}
+                  title="Reveal Final Answer (Key A or →)"
+                >
+                  <span>🎉 Reveal Final Answer</span>
+                  <span style={{ fontSize: '10px', opacity: 0.9, background: 'rgba(0,0,0,0.35)', color: '#FFFFFF', padding: '2px 6px', borderRadius: '4px' }}>Key A / →</span>
+                </button>
+              ) : (
+                activeQuestionIndex < questions.length - 1 ? (
+                  <button
+                    onClick={() => {
+                      handleProgressiveAction();
+                    }}
+                    className="btn btn-primary pulsing-glow"
+                    style={{
+                      padding: '10px 24px',
+                      fontSize: '14px',
+                      fontWeight: 900,
+                      borderRadius: '10px',
+                      background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                      color: '#FFFFFF',
+                      boxShadow: '0 4px 20px rgba(16, 185, 129, 0.45)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: 'pointer',
+                    }}
+                    title="Next Challenge (Space or →)"
+                  >
+                    <span>➡️ Next Challenge (#{activeQuestionIndex + 2})</span>
+                    <span style={{ fontSize: '10px', opacity: 0.9, background: 'rgba(0,0,0,0.35)', color: '#FFFFFF', padding: '2px 6px', borderRadius: '4px' }}>Space / →</span>
+                  </button>
+                ) : null
+              )}
 
               <button
                 onClick={() => setFullscreenImage(null)}
