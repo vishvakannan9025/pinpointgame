@@ -5,7 +5,7 @@ import { useAdmin } from '../context/AdminContext';
 export const NetworkQrHub = () => {
   const { room } = useAdmin();
 
-  const [publicUrl, setPublicUrl] = useState('https://loud-ends-eva-observed.trycloudflare.com');
+  const [publicUrl, setPublicUrl] = useState('https://definition-tears-light-frank.trycloudflare.com');
   const [localWifiUrl, setLocalWifiUrl] = useState('http://10.14.241.188:3000');
   const [localhostUrl, setLocalhostUrl] = useState('http://localhost:3000');
 

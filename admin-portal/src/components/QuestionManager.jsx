@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useAdmin } from '../context/AdminContext';
 
 export const QuestionManager = () => {
@@ -16,12 +16,17 @@ export const QuestionManager = () => {
     reorderQuestions,
     resetToSampleQuestions,
     setActiveQuestion,
+    activeRound,
+    switchRound,
+    ROUND_1_QUESTIONS,
+    ROUND_2_QUESTIONS,
   } = useAdmin();
 
   const [editingQuestion, setEditingQuestion] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedCat, setSelectedCat] = useState('ALL');
 
-  const handleOpenAdd = () => {
+  const handleOpenAdd = useCallback(() => {
     setEditingQuestion({
       id: Date.now().toString(),
       question: '4-Clue Visual Challenge',
@@ -31,9 +36,9 @@ export const QuestionManager = () => {
       points: 10,
     });
     setIsModalOpen(true);
-  };
+  }, []);
 
-  const handleOpenEdit = (q) => {
+  const handleOpenEdit = useCallback((q) => {
     const rawClues = q.clues && q.clues.length >= 4
       ? [...q.clues]
       : [...(q.clues || []), '', '', '', ''].slice(0, 4);
@@ -49,9 +54,9 @@ export const QuestionManager = () => {
       answer: q.answer || (q.options ? q.options[q.correctOptionIndex || 0] : ''),
     });
     setIsModalOpen(true);
-  };
+  }, []);
 
-  const handleSaveModal = (savedQ) => {
+  const handleSaveModal = useCallback((savedQ) => {
     const isExisting = questions.some((q) => q.id === savedQ.id);
     if (isExisting) {
       updateQuestion(savedQ);
@@ -59,61 +64,235 @@ export const QuestionManager = () => {
       addQuestion(savedQ);
     }
     setIsModalOpen(false);
-  };
+  }, [questions, updateQuestion, addQuestion]);
 
-  const handleMoveUp = (index) => {
+  const handleMoveUp = useCallback((index) => {
     if (index === 0) return;
     const reordered = [...questions];
     const temp = reordered[index - 1];
     reordered[index - 1] = reordered[index];
     reordered[index] = temp;
     reorderQuestions(reordered);
-  };
+  }, [questions, reorderQuestions]);
 
-  const handleMoveDown = (index) => {
+  const handleMoveDown = useCallback((index) => {
     if (index === questions.length - 1) return;
     const reordered = [...questions];
     const temp = reordered[index + 1];
     reordered[index + 1] = reordered[index];
     reordered[index] = temp;
     reorderQuestions(reordered);
-  };
+  }, [questions, reorderQuestions]);
+
+  const handleCategorySelect = useCallback((cat) => {
+    setSelectedCat(cat);
+  }, []);
+
+  const displayedQuestions = useMemo(() => {
+    return questions
+      .map((q, originalIdx) => ({ q, originalIdx }))
+      .filter(({ q }) => selectedCat === 'ALL' || q.category === selectedCat);
+  }, [questions, selectedCat]);
 
   const currentLive = questions[activeQuestionIndex];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Top Header */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Top Header & Round Switcher */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         flexWrap: 'wrap',
-        gap: '14px',
-        padding: '24px 28px',
+        gap: '16px',
+        padding: '22px 28px',
         borderRadius: 'var(--radius-lg)',
         background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.9) 100%)',
         border: '1.5px solid rgba(99, 102, 241, 0.4)',
         boxShadow: 'var(--shadow-card)',
       }}>
         <div>
-          <h2 style={{ fontSize: '22px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span>💡</span> 4-CLUE CHALLENGE & IMAGE BANK
-          </h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px' }}>
-            Manage mystery challenges with 4 progressive clues + images (Clue 1 → Clue 2 → Clue 3 → Clue 4 → Final Answer).
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <h2 style={{ fontSize: '22px', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
+              <span>💡</span> 4-CLUE CHALLENGE & IMAGE BANK
+            </h2>
+
+            {/* Round Buttons */}
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              background: 'rgba(0, 0, 0, 0.4)',
+              padding: '4px',
+              borderRadius: '12px',
+              border: '1.5px solid rgba(255, 255, 255, 0.1)',
+              gap: '4px',
+            }}>
+              <button
+                onClick={() => {
+                  setSelectedCat('ALL');
+                  switchRound(1);
+                }}
+                style={{
+                  padding: '6px 18px',
+                  borderRadius: '9px',
+                  border: 'none',
+                  background: activeRound === 1
+                    ? 'linear-gradient(135deg, #0284C7 0%, #4F46E5 100%)'
+                    : 'transparent',
+                  color: activeRound === 1 ? '#FFFFFF' : 'var(--text-muted)',
+                  fontSize: '13px',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <span>📁</span> ROUND 1 ({ROUND_1_QUESTIONS.length} Qs)
+              </button>
+
+              <button
+                onClick={() => {
+                  setSelectedCat('ALL');
+                  switchRound(2);
+                }}
+                style={{
+                  padding: '6px 18px',
+                  borderRadius: '9px',
+                  border: 'none',
+                  background: activeRound === 2
+                    ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
+                    : 'transparent',
+                  color: activeRound === 2 ? '#000000' : 'var(--text-muted)',
+                  fontSize: '13px',
+                  fontWeight: 900,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <span>🎬</span> ROUND 2 ({ROUND_2_QUESTIONS.length} Tamil Movies)
+              </button>
+            </div>
+          </div>
+
+          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '6px', margin: 0 }}>
+            Active: <strong>Round {activeRound}</strong> — {questions.length} Challenges loaded. Each challenge has 4 clues + images + instant answer reveal.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button onClick={resetToSampleQuestions} className="btn btn-secondary btn-sm" style={{ padding: '8px 16px' }}>
-            🔄 Reset 5 Samples
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button onClick={() => switchRound(activeRound)} className="btn btn-secondary btn-sm" style={{ padding: '8px 16px' }}>
+            🔄 Reload Defaults
           </button>
           <button onClick={handleOpenAdd} className="btn btn-primary btn-sm pulsing-glow" style={{ padding: '8px 20px', fontWeight: 800 }}>
             ➕ Add Challenge
           </button>
         </div>
       </div>
+
+      {/* Round 1 Category Filter Bar (Visible when Round 1 is active) */}
+      {activeRound === 1 && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          flexWrap: 'wrap',
+          padding: '12px 18px',
+          background: 'rgba(15, 23, 42, 0.75)',
+          borderRadius: '14px',
+          border: '1px solid rgba(56, 189, 248, 0.25)',
+        }}>
+          <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--accent-cyan)', marginRight: '6px' }}>
+            📁 ROUND 1 SETS:
+          </span>
+
+          {[
+            { id: 'ALL', label: 'All 20 Challenges', icon: '🌟' },
+            { id: 'Guess the Movie', label: '1. Guess the Movie (1-5)', icon: '🍿' },
+            { id: 'Guess the Hidden Category', label: '2. Hidden Category (6-10)', icon: '🔍' },
+            { id: 'Guess the Cartoon', label: '3. Guess the Cartoon (11-15)', icon: '🎨' },
+            { id: 'Guess The Game', label: '4. Guess The Game (16-20)', icon: '🎮' },
+          ].map((cat) => {
+            const isSelected = selectedCat === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => handleCategorySelect(cat.id)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '9px',
+                  border: isSelected ? '1.5px solid var(--accent-cyan)' : '1px solid rgba(255, 255, 255, 0.1)',
+                  background: isSelected ? 'linear-gradient(135deg, #0284C7 0%, #4F46E5 100%)' : 'rgba(255, 255, 255, 0.05)',
+                  color: isSelected ? '#FFFFFF' : 'var(--text-muted)',
+                  fontSize: '12px',
+                  fontWeight: isSelected ? 800 : 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <span>{cat.icon}</span>
+                <span>{cat.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Round 2 Category Filter Bar (Visible when Round 2 is active) */}
+      {activeRound === 2 && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          flexWrap: 'wrap',
+          padding: '12px 18px',
+          background: 'rgba(15, 23, 42, 0.75)',
+          borderRadius: '14px',
+          border: '1px solid rgba(245, 158, 11, 0.3)',
+        }}>
+          <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--winner-gold)', marginRight: '6px' }}>
+            🎬 ROUND 2 SETS:
+          </span>
+
+          {[
+            { id: 'ALL', label: 'All 10 Challenges', icon: '🌟' },
+            { id: 'Guess the Lyrics', label: '1. Guess the Lyrics (1-5)', icon: '🎵' },
+            { id: 'Demo 1 - Identify the Tamil Movie', label: '2. Demo 1 - Tamil Movies (6-10)', icon: '🎬' },
+          ].map((cat) => {
+            const isSelected = selectedCat === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => handleCategorySelect(cat.id)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '9px',
+                  border: isSelected ? '1.5px solid var(--winner-gold)' : '1px solid rgba(255, 255, 255, 0.1)',
+                  background: isSelected ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)' : 'rgba(255, 255, 255, 0.05)',
+                  color: isSelected ? '#000000' : 'var(--text-muted)',
+                  fontSize: '12px',
+                  fontWeight: isSelected ? 900 : 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <span>{cat.icon}</span>
+                <span>{cat.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Live Stage Broadcaster Bar */}
       {questions.length > 0 && currentLive && (
@@ -214,23 +393,23 @@ export const QuestionManager = () => {
             </button>
           </div>
         ) : (
-          questions.map((q, idx) => {
-            const isLive = idx === activeQuestionIndex;
+          displayedQuestions.map(({ q, originalIdx }) => {
+            const isLive = originalIdx === activeQuestionIndex;
             const answerText = q.answer || (q.options && q.options[q.correctOptionIndex]) || 'NO ANSWER';
 
             return (
               <ChallengeCard
-                key={q.id || idx}
+                key={q.id || originalIdx}
                 q={q}
-                idx={idx}
+                idx={originalIdx}
                 isLive={isLive}
                 answerText={answerText}
-                onSetActive={() => setActiveQuestion(idx)}
-                onMoveUp={() => handleMoveUp(idx)}
-                onMoveDown={() => handleMoveDown(idx)}
+                onSetActive={() => setActiveQuestion(originalIdx)}
+                onMoveUp={() => handleMoveUp(originalIdx)}
+                onMoveDown={() => handleMoveDown(originalIdx)}
                 onEdit={() => handleOpenEdit(q)}
                 onDelete={() => {
-                  if (window.confirm(`Delete Challenge #${idx + 1}?`)) {
+                  if (window.confirm(`Delete Challenge #${originalIdx + 1}?`)) {
                     deleteQuestion(q.id);
                   }
                 }}
@@ -252,8 +431,8 @@ export const QuestionManager = () => {
   );
 };
 
-// ─── Challenge Card with Progressive Clue Preview & Images ───
-const ChallengeCard = ({ q, idx, isLive, answerText, onSetActive, onMoveUp, onMoveDown, onEdit, onDelete }) => {
+// ─── Challenge Card with Progressive Clue Preview & Images (React.memo for 60fps performance) ───
+const ChallengeCard = React.memo(({ q, idx, isLive, answerText, onSetActive, onMoveUp, onMoveDown, onEdit, onDelete }) => {
   const [previewClue, setPreviewClue] = useState(1);
 
   const clues = q.clues && q.clues.length >= 4
@@ -269,7 +448,7 @@ const ChallengeCard = ({ q, idx, isLive, answerText, onSetActive, onMoveUp, onMo
 
   return (
     <div
-      className="glass-card"
+      className="glass-card challenge-card-item"
       style={{
         padding: '24px 28px',
         border: isLive ? '1.8px solid var(--accent-primary)' : '1px solid var(--border-glass)',
@@ -413,6 +592,8 @@ const ChallengeCard = ({ q, idx, isLive, answerText, onSetActive, onMoveUp, onMo
               <img
                 src={activeImage}
                 alt={`Clue #${previewClue}`}
+                loading="lazy"
+                decoding="async"
                 style={{
                   width: '140px',
                   height: '95px',
@@ -482,7 +663,8 @@ const ChallengeCard = ({ q, idx, isLive, answerText, onSetActive, onMoveUp, onMo
       </div>
     </div>
   );
-};
+});
+ChallengeCard.displayName = 'ChallengeCard';
 
 // ─── Modal Editor with 4 Clues + Image URL / File Upload for Each ───
 const QuestionEditorModal = ({ question, onSave, onClose }) => {

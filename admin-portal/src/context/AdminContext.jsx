@@ -1,116 +1,17 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { socketService } from '../services/socket';
 import confetti from 'canvas-confetti';
+import { ROUND_1_QUESTIONS, ROUND_2_QUESTIONS } from '../data/questionRounds';
 
 const AdminContext = createContext();
 
-const SAMPLE_QUESTIONS = [
-  {
-    id: 'sample-1',
-    question: 'Identify the Planet',
-    clues: [
-      'It is the largest planet in our Solar System, with a mass more than twice that of all other planets combined.',
-      'It rotates faster than any other planet, with a day lasting less than 10 hours.',
-      'It features the iconic Great Red Spot, a colossal anticyclonic storm raging for centuries.',
-      'It has 95 officially recognized moons, including Ganymede, the solar system’s largest moon.',
-    ],
-    clueImages: [
-      'https://images.unsplash.com/photo-1614732414444-096e5f1122d5?w=600&auto=format&fit=crop&q=80',
-      '',
-      'https://images.unsplash.com/photo-1614728894747-a83421e2b9c9?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1614730321146-b6fa6a46bcb4?w=600&auto=format&fit=crop&q=80',
-    ],
-    answer: 'JUPITER',
-    options: ['Mars', 'Jupiter', 'Saturn', 'Neptune'],
-    correctOptionIndex: 1,
-    points: 10,
-  },
-  {
-    id: 'sample-2',
-    question: 'Identify the Programming Language',
-    clues: [
-      'It was famously created in May 1995 by Brendan Eich in just 10 days.',
-      'Initially developed under the codename Mocha, it was later renamed LiveScript before taking its famous name.',
-      'It powers dynamic client-side scripting across virtually 99% of all modern web browsers.',
-      'It is standardized under the ECMAScript specification, known for prototype inheritance and event loops.',
-    ],
-    clueImages: [
-      '',
-      '',
-      'https://images.unsplash.com/photo-1579468118864-1b9ea3c0db4a?w=600&auto=format&fit=crop&q=80',
-      '',
-    ],
-    answer: 'JAVASCRIPT',
-    options: ['Python', 'Java', 'JavaScript', 'C++'],
-    correctOptionIndex: 2,
-    points: 10,
-  },
-  {
-    id: 'sample-3',
-    question: 'Identify the Monument',
-    clues: [
-      'It was commissioned in 1631 by Mughal Emperor Shah Jahan as a mausoleum for his beloved wife Mumtaz Mahal.',
-      'It stands majestically on the right bank of the sacred Yamuna River in Agra, India.',
-      'It is constructed entirely of pristine ivory-white Makrana marble that changes hue with the sunlight.',
-      'A designated UNESCO World Heritage Site celebrated universally as one of the New 7 Wonders of the World.',
-    ],
-    clueImages: [
-      '',
-      'https://images.unsplash.com/photo-1564507592333-c60657eea523?w=600&auto=format&fit=crop&q=80',
-      '',
-      'https://images.unsplash.com/photo-1548013146-72479768bada?w=600&auto=format&fit=crop&q=80',
-    ],
-    answer: 'TAJ MAHAL',
-    options: ['Red Fort', 'Qutub Minar', 'Taj Mahal', 'India Gate'],
-    correctOptionIndex: 2,
-    points: 10,
-  },
-  {
-    id: 'sample-4',
-    question: 'Identify the Tech Giant',
-    clues: [
-      'It was founded in September 1998 in a garage in Menlo Park, California by Ph.D. students Larry Page and Sergey Brin.',
-      'Its revolutionary core technology began with the PageRank algorithm for ranking web page relevance.',
-      'It develops the world’s most dominant smartphone operating system, Android, and the Chrome web browser.',
-      'Its parent holding conglomerate is Alphabet Inc., and its name is derived from a mathematical term for 1 followed by 100 zeros.',
-    ],
-    clueImages: [
-      '',
-      '',
-      'https://images.unsplash.com/photo-1573804633927-bfcbcd909acd?w=600&auto=format&fit=crop&q=80',
-      '',
-    ],
-    answer: 'GOOGLE',
-    options: ['Apple', 'Microsoft', 'Google', 'Amazon'],
-    correctOptionIndex: 2,
-    points: 10,
-  },
-  {
-    id: 'sample-5',
-    question: 'Identify the Legendary Scientist',
-    clues: [
-      'He was awarded the 1921 Nobel Prize in Physics for his discovery of the law of the photoelectric effect.',
-      'In his miracle year (Annus Mirabilis) of 1905, he published four groundbreaking papers that changed modern physics.',
-      'He developed the Special and General Theories of Relativity, reshaping our understanding of spacetime and gravity.',
-      'He formulated the world’s most famous scientific equation: E = mc².',
-    ],
-    clueImages: [
-      '',
-      '',
-      'https://images.unsplash.com/photo-1509228468518-180dd4864904?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=600&auto=format&fit=crop&q=80',
-    ],
-    answer: 'ALBERT EINSTEIN',
-    options: ['Isaac Newton', 'Nikola Tesla', 'Albert Einstein', 'Niels Bohr'],
-    correctOptionIndex: 2,
-    points: 10,
-  },
-];
+export { ROUND_1_QUESTIONS, ROUND_2_QUESTIONS };
 
 export const AdminProvider = ({ children }) => {
-  // Authentication
+  // Authentication - Always prompt for password on open / reload (both local & Cloudflare)
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return localStorage.getItem('pinpoint_admin_auth') === 'true';
+    localStorage.removeItem('pinpoint_admin_auth');
+    return false;
   });
 
   // Socket & Connectivity
@@ -127,14 +28,210 @@ export const AdminProvider = ({ children }) => {
     return localStorage.getItem('pinpoint_admin_token') || null;
   });
 
+  // Active Round State (1 or 2)
+  const [activeRound, setActiveRound] = useState(() => {
+    const saved = localStorage.getItem('pinpoint_active_round');
+    return saved ? parseInt(saved, 10) : 1;
+  });
+
   // Questions State
   const [questions, setQuestions] = useState(() => {
+    const savedRound = localStorage.getItem('pinpoint_active_round');
+    const currentRoundNum = savedRound ? parseInt(savedRound, 10) : 1;
+    const defaultForRound = currentRoundNum === 2 ? ROUND_2_QUESTIONS : ROUND_1_QUESTIONS;
     const saved = localStorage.getItem('pinpoint_questions');
-    return saved ? JSON.parse(saved) : SAMPLE_QUESTIONS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && Array.isArray(parsed)) {
+          // If Round 1 has fewer than 20 questions (e.g. was filtered to 5), auto-restore full 20 questions
+          if (currentRoundNum === 1 && parsed.length < ROUND_1_QUESTIONS.length) {
+            localStorage.setItem('pinpoint_questions', JSON.stringify(defaultForRound));
+            return defaultForRound;
+          }
+          if (parsed[0]?.id?.startsWith('sample-')) {
+            localStorage.setItem('pinpoint_questions', JSON.stringify(defaultForRound));
+            return defaultForRound;
+          }
+          return parsed;
+        }
+      } catch (_) {}
+    }
+    localStorage.setItem('pinpoint_questions', JSON.stringify(defaultForRound));
+    return defaultForRound;
   });
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false);
   const [revealedClueCount, setRevealedClueCount] = useState(1);
+
+  // Category Title Slide State (Cover page shown before starting category questions)
+  const [categoryTitleActive, setCategoryTitleActive] = useState(true);
+
+  // Clue Timer State (Clue 1: 30s, Clue 2: 15s, Clue 3: 15s, Clue 4: 15s. Answer: No timer)
+  const [timerRemaining, setTimerRemaining] = useState(30);
+  const [timerDuration, setTimerDuration] = useState(30);
+  const [isTimerPaused, setIsTimerPaused] = useState(false);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const [isAutoTimerEnabled, setIsAutoTimerEnabled] = useState(true);
+
+  // Team Scores / Marks System
+  // Rules: Clue 1 = 4 points, Clue 2 = 3 points, Clue 3 = 2 points, Clue 4 = 1 point
+  const [teamScores, setTeamScores] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pinpoint_team_scores');
+      return saved ? JSON.parse(saved) : {};
+    } catch (_) {
+      return {};
+    }
+  });
+
+  const awardPoints = useCallback((teamId, teamName, clueNum, customPts = null) => {
+    const pts = customPts !== null
+      ? customPts
+      : (clueNum === 1 ? 4 : clueNum === 2 ? 3 : clueNum === 3 ? 2 : 1);
+
+    const currentQ = questions && questions[activeQuestionIndex];
+    const category = currentQ?.category || (activeRound === 1 ? 'Round 1 Challenge' : 'Round 2 Challenge');
+
+    setTeamScores((prev) => {
+      const current = prev[teamId] || {
+        id: teamId,
+        name: teamName,
+        score: 0,
+        round1Score: 0,
+        round2Score: 0,
+        categoryScores: {},
+        history: [],
+      };
+
+      const prevR1 = current.round1Score !== undefined ? current.round1Score : (activeRound === 1 ? (current.score || 0) : 0);
+      const prevR2 = current.round2Score !== undefined ? current.round2Score : (activeRound === 2 ? (current.score || 0) : 0);
+      const newR1 = activeRound === 1 ? Math.max(0, prevR1 + pts) : prevR1;
+      const newR2 = activeRound === 2 ? Math.max(0, prevR2 + pts) : prevR2;
+      const prevCatScore = (current.categoryScores && current.categoryScores[category]) || 0;
+      const newCatScores = {
+        ...(current.categoryScores || {}),
+        [category]: Math.max(0, prevCatScore + pts),
+      };
+
+      const updated = {
+        ...prev,
+        [teamId]: {
+          ...current,
+          name: teamName || current.name,
+          score: newR1 + newR2,
+          round1Score: newR1,
+          round2Score: newR2,
+          categoryScores: newCatScores,
+          lastAwardedClue: clueNum,
+          lastPointsAwarded: pts,
+          lastCategory: category,
+          lastRound: activeRound,
+          history: [
+            ...(current.history || []),
+            {
+              round: activeRound,
+              category,
+              challengeIndex: activeQuestionIndex,
+              clueNum,
+              points: pts,
+              timestamp: Date.now(),
+            },
+          ],
+        },
+      };
+      localStorage.setItem('pinpoint_team_scores', JSON.stringify(updated));
+      socketService.emit('update_team_scores', { teamScores: updated });
+      return updated;
+    });
+
+    try {
+      confetti({
+        particleCount: 50,
+        spread: 60,
+        origin: { y: 0.6 },
+        colors: ['#FBBF24', '#10B981', '#38BDF8'],
+      });
+    } catch (_) {}
+  }, [activeRound, activeQuestionIndex, questions]);
+
+  const adjustPoints = useCallback((teamId, teamName, delta) => {
+    const currentQ = questions && questions[activeQuestionIndex];
+    const category = currentQ?.category || (activeRound === 1 ? 'Round 1 Challenge' : 'Round 2 Challenge');
+
+    setTeamScores((prev) => {
+      const current = prev[teamId] || {
+        id: teamId,
+        name: teamName,
+        score: 0,
+        round1Score: 0,
+        round2Score: 0,
+        categoryScores: {},
+        history: [],
+      };
+
+      const prevR1 = current.round1Score !== undefined ? current.round1Score : (activeRound === 1 ? (current.score || 0) : 0);
+      const prevR2 = current.round2Score !== undefined ? current.round2Score : (activeRound === 2 ? (current.score || 0) : 0);
+      const newR1 = activeRound === 1 ? Math.max(0, prevR1 + delta) : prevR1;
+      const newR2 = activeRound === 2 ? Math.max(0, prevR2 + delta) : prevR2;
+
+      const updated = {
+        ...prev,
+        [teamId]: {
+          ...current,
+          name: teamName || current.name,
+          score: Math.max(0, (current.score || 0) + delta),
+          round1Score: newR1,
+          round2Score: newR2,
+          history: [
+            ...(current.history || []),
+            {
+              round: activeRound,
+              category,
+              challengeIndex: activeQuestionIndex,
+              clueNum: null,
+              points: delta,
+              timestamp: Date.now(),
+            },
+          ],
+        },
+      };
+      localStorage.setItem('pinpoint_team_scores', JSON.stringify(updated));
+      socketService.emit('update_team_scores', { teamScores: updated });
+      return updated;
+    });
+  }, [activeRound, activeQuestionIndex, questions]);
+
+  const resetTeamScores = useCallback(() => {
+    setTeamScores({});
+    localStorage.removeItem('pinpoint_team_scores');
+    socketService.emit('update_team_scores', { teamScores: {} });
+  }, []);
+
+  // Invisible Hotkey listener: Press 'P' to pause/resume countdown timer
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) return;
+      if (e.code === 'KeyP' || e.key === 'p' || e.key === 'P') {
+        e.preventDefault();
+        setIsTimerPaused((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
+
+  const toggleTimerPause = useCallback(() => {
+    setIsTimerPaused((prev) => !prev);
+  }, []);
+
+  const pauseTimer = useCallback(() => {
+    setIsTimerPaused(true);
+  }, []);
+
+  const resumeTimer = useCallback(() => {
+    setIsTimerPaused(false);
+  }, []);
 
   // Initialize socket on mount
   useEffect(() => {
@@ -235,6 +332,13 @@ export const AdminProvider = ({ children }) => {
       }
     };
 
+    const handleTeamScoresUpdated = (data) => {
+      if (data && data.teamScores) {
+        setTeamScores(data.teamScores);
+        localStorage.setItem('pinpoint_team_scores', JSON.stringify(data.teamScores));
+      }
+    };
+
     socketService.on('status_change', handleStatus);
     socketService.on('latency_update', handleLatency);
     socketService.on('room_updated', handleRoomUpdated);
@@ -249,6 +353,7 @@ export const AdminProvider = ({ children }) => {
     socketService.on('active_question_changed', handleActiveQuestionChanged);
     socketService.on('clue_count_changed', handleClueCountChanged);
     socketService.on('answer_revealed', handleAnswerRevealed);
+    socketService.on('team_scores_updated', handleTeamScoresUpdated);
 
     return () => {
       socketService.off('status_change', handleStatus);
@@ -265,6 +370,7 @@ export const AdminProvider = ({ children }) => {
       socketService.off('active_question_changed', handleActiveQuestionChanged);
       socketService.off('clue_count_changed', handleClueCountChanged);
       socketService.off('answer_revealed', handleAnswerRevealed);
+      socketService.off('team_scores_updated', handleTeamScoresUpdated);
     };
   }, []);
 
@@ -292,7 +398,8 @@ export const AdminProvider = ({ children }) => {
   const login = async (passcode) => {
     if (passcode === 'admin123' || passcode === 'admin') {
       setIsAuthenticated(true);
-      localStorage.setItem('pinpoint_admin_auth', 'true');
+      // Explicitly do not persist session in localStorage so that reopening tab/portal always requires password
+      localStorage.removeItem('pinpoint_admin_auth');
       if (isConnected) {
         socketService.emit('bind_admin', { passcode }).then((res) => {
           if (res && res.success) {
@@ -304,7 +411,7 @@ export const AdminProvider = ({ children }) => {
       }
       return { success: true };
     }
-    return { success: false, error: 'Incorrect passcode. Try "admin123".' };
+    return { success: false, error: 'Incorrect passcode. Please try again.' };
   };
 
   const logout = () => {
@@ -325,18 +432,22 @@ export const AdminProvider = ({ children }) => {
   };
 
   const startRound = async () => {
-    if (!room || !adminToken) return;
+    const roomId = room?.roomId || 'PINPOINT';
+    const token = adminToken || localStorage.getItem('pinpoint_admin_token');
+    if (!token) return;
     return await socketService.emit('start_round', {
-      roomId: room.roomId,
-      adminToken,
+      roomId,
+      adminToken: token,
     });
   };
 
   const lockRound = async () => {
-    if (!room || !adminToken) return;
+    const roomId = room?.roomId || 'PINPOINT';
+    const token = adminToken || localStorage.getItem('pinpoint_admin_token');
+    if (!token) return;
     return await socketService.emit('lock_round', {
-      roomId: room.roomId,
-      adminToken,
+      roomId,
+      adminToken: token,
     });
   };
 
@@ -417,43 +528,105 @@ export const AdminProvider = ({ children }) => {
     socketService.emit('update_questions', { questions: newOrder });
   };
 
-  const resetToSampleQuestions = () => {
-    setQuestions(SAMPLE_QUESTIONS);
-    localStorage.setItem('pinpoint_questions', JSON.stringify(SAMPLE_QUESTIONS));
-    socketService.emit('update_questions', { questions: SAMPLE_QUESTIONS });
-  };
+  const switchRound = (roundNum) => {
+    const targetRound = parseInt(roundNum, 10) === 2 ? 2 : 1;
+    setActiveRound(targetRound);
+    localStorage.setItem('pinpoint_active_round', targetRound.toString());
 
-  const setActiveQuestion = (index) => {
-    setActiveQuestionIndex(index);
+    const targetQuestions = targetRound === 2 ? ROUND_2_QUESTIONS : ROUND_1_QUESTIONS;
+    setQuestions(targetQuestions);
+    setActiveQuestionIndex(0);
     setIsAnswerRevealed(false);
     setRevealedClueCount(1);
-    socketService.emit('set_active_question', { index });
-  };
+    setCategoryTitleActive(true); // Open with category title slide
+    setIsTimerPaused(false);
+    setIsTimerRunning(false);
+    setTimerRemaining(30);
+    setTimerDuration(30);
+    localStorage.setItem('pinpoint_questions', JSON.stringify(targetQuestions));
 
-  const revealNextClue = () => {
-    if (revealedClueCount < 4) {
-      const next = revealedClueCount + 1;
-      setRevealedClueCount(next);
-      socketService.emit('reveal_next_clue');
-    }
-  };
-
-  const setClueCount = (count) => {
-    const valid = Math.max(1, Math.min(4, count));
-    setRevealedClueCount(valid);
-    socketService.emit('set_clue_count', { count: valid });
-  };
-
-  const resetClues = () => {
-    setRevealedClueCount(1);
-    setIsAnswerRevealed(false);
+    socketService.emit('update_questions', { questions: targetQuestions });
+    socketService.emit('set_active_question', { index: 0 });
     socketService.emit('reset_clues');
   };
 
-  const revealAnswer = (isRevealed) => {
+  const loadQuestionCategory = (categoryName) => {
+    const allRoundQuestions = activeRound === 2 ? ROUND_2_QUESTIONS : ROUND_1_QUESTIONS;
+    
+    // Always preserve all questions for the active round
+    if (questions.length < allRoundQuestions.length) {
+      setQuestions(allRoundQuestions);
+      localStorage.setItem('pinpoint_questions', JSON.stringify(allRoundQuestions));
+      socketService.emit('update_questions', { questions: allRoundQuestions });
+    }
+
+    if (!categoryName || categoryName === 'ALL') {
+      setActiveQuestionIndex(0);
+      setIsAnswerRevealed(false);
+      setRevealedClueCount(1);
+      setCategoryTitleActive(false);
+      socketService.emit('set_active_question', { index: 0 });
+      return;
+    }
+
+    const targetIdx = allRoundQuestions.findIndex((q) =>
+      q.category === categoryName ||
+      q.category.toLowerCase().includes(categoryName.toLowerCase())
+    );
+
+    if (targetIdx !== -1) {
+      setActiveQuestionIndex(targetIdx);
+      setIsAnswerRevealed(false);
+      setRevealedClueCount(1);
+      setCategoryTitleActive(false);
+      socketService.emit('set_active_question', { index: targetIdx });
+    }
+  };
+
+  const resetToSampleQuestions = () => {
+    switchRound(activeRound);
+  };
+
+  const setActiveQuestion = useCallback((index) => {
+    setActiveQuestionIndex(index);
+    setIsAnswerRevealed(false);
+    setRevealedClueCount(1);
+    setTimerDuration(30);
+    setTimerRemaining(30);
+    setIsTimerPaused(false);
+    socketService.emit('set_active_question', { index });
+  }, []);
+
+  const revealNextClue = useCallback(() => {
+    setRevealedClueCount((prev) => {
+      if (prev < 4) {
+        const next = prev + 1;
+        socketService.emit('reveal_next_clue');
+        return next;
+      }
+      return prev;
+    });
+  }, []);
+
+  const setClueCount = useCallback((count) => {
+    const valid = Math.max(1, Math.min(4, count));
+    setRevealedClueCount(valid);
+    socketService.emit('set_clue_count', { count: valid });
+  }, []);
+
+  const resetClues = useCallback(() => {
+    setRevealedClueCount(1);
+    setIsAnswerRevealed(false);
+    setTimerDuration(30);
+    setTimerRemaining(30);
+    setIsTimerPaused(false);
+    socketService.emit('reset_clues');
+  }, []);
+
+  const revealAnswer = useCallback((isRevealed) => {
     setIsAnswerRevealed(isRevealed);
-    socketService.emit('reveal_answer', { isRevealed });
     if (isRevealed) {
+      setIsTimerRunning(false);
       try {
         confetti({
           particleCount: 80,
@@ -463,7 +636,61 @@ export const AdminProvider = ({ children }) => {
         });
       } catch (_) {}
     }
-  };
+    socketService.emit('reveal_answer', { isRevealed });
+  }, []);
+
+  // ----------------------------------------------------
+  // CLUE TIMER ENGINE (Round 1 & Round 2)
+  // Clue 1: 30s -> Auto advance to Clue 2
+  // Clue 2: 15s -> Auto advance to Clue 3
+  // Clue 3: 15s -> Auto advance to Clue 4
+  // Clue 4: 15s -> STOP! Stays on Clue 4. Host reveals Answer manually.
+  // ----------------------------------------------------
+  useEffect(() => {
+    if (!isAutoTimerEnabled) {
+      setIsTimerRunning(false);
+      return;
+    }
+
+    if (categoryTitleActive || isAnswerRevealed) {
+      setIsTimerRunning(false);
+      return;
+    }
+
+    // Clue 1 is 30s, remaining clues (2, 3, 4) are 15s each
+    const duration = revealedClueCount === 1 ? 30 : 15;
+    setTimerDuration(duration);
+    setTimerRemaining(duration);
+    setIsTimerPaused(false);
+    setIsTimerRunning(true);
+  }, [activeRound, activeQuestionIndex, revealedClueCount, isAnswerRevealed, categoryTitleActive, isAutoTimerEnabled]);
+
+  useEffect(() => {
+    if (!isTimerRunning || isTimerPaused || categoryTitleActive || isAnswerRevealed) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setTimerRemaining((prev) => {
+        if (prev <= 1) {
+          if (revealedClueCount < 4) {
+            // Automatically advance to the next clue
+            revealNextClue();
+            const nextDur = 15;
+            setTimerDuration(nextDur);
+            return nextDur;
+          } else {
+            // Clue 4 finished: stop timer, stay on Clue 4. DO NOT reveal answer!
+            setIsTimerRunning(false);
+            return 0;
+          }
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isTimerRunning, isTimerPaused, categoryTitleActive, isAnswerRevealed, revealedClueCount, revealNextClue]);
 
   return (
     <AdminContext.Provider
@@ -487,6 +714,11 @@ export const AdminProvider = ({ children }) => {
         endRoom,
         kickParticipant,
         clearAllParticipants,
+        activeRound,
+        switchRound,
+        loadQuestionCategory,
+        ROUND_1_QUESTIONS,
+        ROUND_2_QUESTIONS,
         questions,
         activeQuestionIndex,
         isAnswerRevealed,
@@ -501,6 +733,21 @@ export const AdminProvider = ({ children }) => {
         resetToSampleQuestions,
         setActiveQuestion,
         revealAnswer,
+        categoryTitleActive,
+        setCategoryTitleActive,
+        timerRemaining,
+        timerDuration,
+        isTimerPaused,
+        isTimerRunning,
+        isAutoTimerEnabled,
+        setIsAutoTimerEnabled,
+        toggleTimerPause,
+        pauseTimer,
+        resumeTimer,
+        teamScores,
+        awardPoints,
+        adjustPoints,
+        resetTeamScores,
       }}
     >
       {children}

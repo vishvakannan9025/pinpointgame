@@ -91,11 +91,12 @@ class SocketService extends ChangeNotifier {
           await prefs.remove('custom_server_url');
         }
       } else {
-        // Native mobile app (Android APK / iOS)
-        // ALWAYS use the hardcoded public tunnel URL from constants.dart
-        // Clear any stale cached URLs (old tunnels, local IPs)
-        _serverUrl = AppConstants.defaultPublicTunnelUrl;
-        if (savedUrl != null && savedUrl != AppConstants.defaultPublicTunnelUrl) {
+        // Native mobile app / desktop app
+        // Use the appropriate default URL (localhost for desktop, tunnel for mobile)
+        _serverUrl = AppConstants.defaultServerUrl;
+        
+        // Clear any stale cached URLs (old tunnels, local IPs) if it differs from current default
+        if (savedUrl != null && savedUrl != _serverUrl) {
           await prefs.setString('custom_server_url', _serverUrl);
           if (kDebugMode) {
             print('🧹 Cleared stale cached URL: $savedUrl → $_serverUrl');
@@ -159,7 +160,6 @@ class SocketService extends ChangeNotifier {
       final testSocket = io.io(
         formatted,
         io.OptionBuilder()
-            .setTransports(['websocket'])
             .disableAutoConnect()
             .setReconnectionAttempts(0)
             .build(),
@@ -224,7 +224,6 @@ class SocketService extends ChangeNotifier {
     _socket = io.io(
       _serverUrl,
       io.OptionBuilder()
-          .setTransports(['websocket'])
           .enableAutoConnect()
           .enableReconnection()
           .setReconnectionAttempts(999999)

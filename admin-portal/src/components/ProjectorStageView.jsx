@@ -12,16 +12,33 @@ export const ProjectorStageView = () => {
     resetClues,
     revealAnswer,
     setActiveQuestion,
+    activeRound,
+    switchRound,
     startRound,
     lockRound,
     resetBuzzer,
+    categoryTitleActive,
+    setCategoryTitleActive,
+    timerRemaining,
+    timerDuration,
+    isTimerPaused,
+    isTimerRunning,
+    isAutoTimerEnabled,
+    setIsAutoTimerEnabled,
+    toggleTimerPause,
+    teamScores,
+    awardPoints,
+    adjustPoints,
   } = useAdmin();
 
   const containerRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // BY DEFAULT: Question occupies the entire screen; buzzer list is hidden until button is pressed
-  const [showBuzzerList, setShowBuzzerList] = useState(false);
+  // Buzzer list is visible by default alongside stage questions, toggleable with Key B
+  const [showBuzzerList, setShowBuzzerList] = useState(true);
+
+  // Selected Team in Buzzer List to award Clue 1/2/3/4 points
+  const [selectedTeamIdForPoints, setSelectedTeamIdForPoints] = useState(null);
 
   // Fullscreen Clue Image Lightbox State
   const [fullscreenImage, setFullscreenImage] = useState(null); // { url, clueNumber, clueText }
@@ -46,7 +63,6 @@ export const ProjectorStageView = () => {
       const target = containerRef.current || document.documentElement;
       if (target.requestFullscreen) {
         target.requestFullscreen().catch(() => {
-          // Fallback to CSS fullscreen
           setIsFullscreen(true);
         });
       } else {
@@ -65,6 +81,7 @@ export const ProjectorStageView = () => {
 
   const currentQ = questions[activeQuestionIndex] || {
     question: 'Mystery Subject',
+    category: 'Guess the Movie',
     clues: [
       'Clue 1 is available. Listen carefully!',
       'Clue 2 reveals more details about the mystery.',
@@ -73,6 +90,74 @@ export const ProjectorStageView = () => {
     ],
     answer: 'ANSWER',
   };
+
+  const currentCategory = currentQ.category || 'Guess the Movie';
+
+  // Helper to get Category Metadata (Category number, Icon, Title, Subtitle, Description)
+  const getCategoryMeta = (catName) => {
+    switch (catName) {
+      case 'Guess the Movie':
+        return {
+          num: 1,
+          icon: '🎬',
+          title: 'Guess the Movie',
+          subtitle: 'Category 1 of 4',
+          description: 'Identify the mystery film from 4 progressive visual clue images! Clue 1: 30s • Clues 2-4: 15s each.',
+        };
+      case 'Guess the Hidden Category':
+        return {
+          num: 2,
+          icon: '🔍',
+          title: 'Guess the Hidden Category',
+          subtitle: 'Category 2 of 4',
+          description: 'Uncover the hidden common connection connecting all 4 clue words! Clue 1: 30s • Clues 2-4: 15s each.',
+        };
+      case 'Guess the Cartoon':
+        return {
+          num: 3,
+          icon: '🎨',
+          title: 'Guess the Cartoon',
+          subtitle: 'Category 3 of 4',
+          description: 'Name the iconic animated character or show from 4 clue descriptions! Clue 1: 30s • Clues 2-4: 15s each.',
+        };
+      case 'Guess The Game':
+      case 'Guess the Game':
+        return {
+          num: 4,
+          icon: '🎮',
+          title: 'Guess The Game',
+          subtitle: 'Category 4 of 4',
+          description: 'Spot the famous mobile, console or board game from 4 clue keywords! Clue 1: 30s • Clues 2-4: 15s each.',
+        };
+      case 'Guess the Lyrics':
+      case 'Guess The Lyrics':
+        return {
+          num: 1,
+          icon: '🎵',
+          title: 'Guess the Lyrics',
+          subtitle: 'Round 2 - Challenge Set 1',
+          description: 'Identify the iconic Tamil song lyrics from translated English lines, genre, music director, and cast! Clue 1: 30s • Clues 2-4: 15s each.',
+        };
+      case 'Demo 1 - Identify the Tamil Movie':
+        return {
+          num: 2,
+          icon: '🎬',
+          title: 'Identify the Tamil Movie',
+          subtitle: 'Round 2 - Challenge Set 2',
+          description: 'Identify the Tamil movie from visual frames and scene clues! Clue 1: 30s • Clues 2-4: 15s each.',
+        };
+      default:
+        return {
+          num: 1,
+          icon: '⭐',
+          title: catName || 'Pinpoint Challenge',
+          subtitle: 'Round 1 Challenge',
+          description: '4 clues will be revealed progressively.',
+        };
+    }
+  };
+
+  const categoryMeta = getCategoryMeta(currentCategory);
 
   const clues = currentQ.clues && currentQ.clues.length >= 4
     ? currentQ.clues.slice(0, 4)
@@ -97,25 +182,99 @@ export const ProjectorStageView = () => {
   const winner = queue.length > 0 ? queue[0] : null;
   const isActive = room ? room.roundStatus === 'ACTIVE' : false;
 
-  // Progressive button action handler
+  // Auto-close lightbox whenever question changes or answer is revealed
+  useEffect(() => {
+    setFullscreenImage(null);
+  }, [activeQuestionIndex, isAnswerRevealed]);
+
+  // Toggle expand image manually with Key 'X' or button click (never auto-expands on next clue)
+  const toggleExpandImage = useCallback(() => {
+    setFullscreenImage((prev) => {
+      if (prev) return null;
+      if (isAnswerRevealed && currentQ.answerImage) {
+        return {
+          url: currentQ.answerImage,
+          clueNumber: 'Answer',
+          clueText: answer,
+        };
+      }
+      if (revealedClueCount > 0 && revealedClueCount <= 4) {
+        const latestClueIndex = revealedClueCount - 1;
+        const latestClueImage = clueImages[latestClueIndex];
+        if (latestClueImage) {
+          return {
+            url: latestClueImage,
+            clueNumber: revealedClueCount,
+            clueText: clues[latestClueIndex],
+          };
+        }
+      }
+      return null;
+    });
+  }, [isAnswerRevealed, currentQ.answerImage, answer, revealedClueCount, clueImages, clues]);
+
+  // Progressive button action handler (Spacebar / Click)
   const handleProgressiveAction = useCallback(() => {
+    // If category title slide is currently showing, start Category Questions!
+    if (categoryTitleActive) {
+      setCategoryTitleActive(false);
+      return;
+    }
+
     if (revealedClueCount < 4) {
       revealNextClue();
     } else if (!isAnswerRevealed) {
+      setFullscreenImage(null);
       revealAnswer(true);
     } else {
+      setFullscreenImage(null);
       if (activeQuestionIndex < questions.length - 1) {
-        setActiveQuestion(activeQuestionIndex + 1);
+        const nextIndex = activeQuestionIndex + 1;
+        const currentCat = questions[activeQuestionIndex]?.category;
+        const nextCat = questions[nextIndex]?.category;
+        setActiveQuestion(nextIndex);
+        if (currentCat !== nextCat) {
+          // Entering a new category! Automatically show the Category Title Cover Slide
+          setCategoryTitleActive(true);
+        }
       }
     }
-  }, [revealedClueCount, isAnswerRevealed, revealNextClue, revealAnswer, activeQuestionIndex, questions.length, setActiveQuestion]);
+  }, [categoryTitleActive, setCategoryTitleActive, revealedClueCount, isAnswerRevealed, revealNextClue, revealAnswer, activeQuestionIndex, questions, setActiveQuestion]);
+
+  const handleResetToFirstQuestion = useCallback(() => {
+    setActiveQuestion(0);
+    resetClues();
+    setCategoryTitleActive(false);
+    setFullscreenImage(null);
+  }, [setActiveQuestion, resetClues]);
+
+  const handlePrevQuestion = useCallback(() => {
+    setCategoryTitleActive(false);
+    setFullscreenImage(null);
+    if (activeQuestionIndex > 0) {
+      setActiveQuestion(activeQuestionIndex - 1);
+      resetClues();
+    }
+  }, [activeQuestionIndex, setActiveQuestion, resetClues]);
+
+  const handleNextQuestion = useCallback(() => {
+    setCategoryTitleActive(false);
+    setFullscreenImage(null);
+    if (activeQuestionIndex < questions.length - 1) {
+      setActiveQuestion(activeQuestionIndex + 1);
+      resetClues();
+    }
+  }, [activeQuestionIndex, questions.length, setActiveQuestion, resetClues]);
 
   // Keyboard shortcuts:
-  // Space / ArrowRight: Next clue / reveal answer
-  // ArrowLeft: Prev challenge
+  // Space / ArrowRight: Next clue / reveal answer / dismiss title slide
+  // ArrowLeft: Prev challenge / Category Title Slide
+  // Key P: Toggle pause / resume clue timer
+  // Key T: Toggle Category Title Slide
+  // Key A: Instantly reveal final answer
   // Key B: Toggle Buzzer List
   // Key F: Toggle Fullscreen
-  // Key R: Reset clues
+  // Key R: Reset clues to Clue 1 (restarts 30s timer)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
@@ -125,9 +284,16 @@ export const ProjectorStageView = () => {
         handleProgressiveAction();
       } else if (e.code === 'ArrowLeft') {
         e.preventDefault();
-        if (activeQuestionIndex > 0) {
-          setActiveQuestion(activeQuestionIndex - 1);
-        }
+        handlePrevQuestion();
+      } else if (e.code === 'KeyP' || e.key === 'p' || e.key === 'P') {
+        e.preventDefault();
+        toggleTimerPause();
+      } else if (e.code === 'KeyT' || e.key === 't' || e.key === 'T') {
+        e.preventDefault();
+        setCategoryTitleActive((prev) => !prev);
+      } else if (e.code === 'KeyA' || e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        revealAnswer(true);
       } else if (e.code === 'KeyB' || e.key === 'b' || e.key === 'B') {
         e.preventDefault();
         setShowBuzzerList((prev) => !prev);
@@ -136,7 +302,10 @@ export const ProjectorStageView = () => {
         toggleFullscreen();
       } else if (e.code === 'KeyR' || e.key === 'r' || e.key === 'R') {
         e.preventDefault();
-        resetClues();
+        handleResetToFirstQuestion();
+      } else if (e.code === 'KeyX' || e.key === 'x' || e.key === 'X') {
+        e.preventDefault();
+        toggleExpandImage();
       } else if (e.key === 'Escape') {
         if (fullscreenImage) {
           e.preventDefault();
@@ -147,27 +316,18 @@ export const ProjectorStageView = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleProgressiveAction, activeQuestionIndex, setActiveQuestion, resetClues, fullscreenImage]);
-
-  const handlePrevQuestion = () => {
-    if (activeQuestionIndex > 0) {
-      setActiveQuestion(activeQuestionIndex - 1);
-    }
-  };
-
-  const handleNextQuestion = () => {
-    if (activeQuestionIndex < questions.length - 1) {
-      setActiveQuestion(activeQuestionIndex + 1);
-    }
-  };
+  }, [handleProgressiveAction, activeQuestionIndex, setActiveQuestion, resetClues, revealAnswer, fullscreenImage, toggleTimerPause, setCategoryTitleActive, toggleExpandImage]);
 
   return (
     <div
       ref={containerRef}
       className={`projector-fullscreen-container ${isFullscreen ? 'is-fullscreen' : ''}`}
       style={{
+        height: isFullscreen ? '100vh' : 'auto',
         minHeight: isFullscreen ? '100vh' : '78vh',
-        gap: '16px',
+        maxHeight: isFullscreen ? '100vh' : 'none',
+        overflow: isFullscreen ? 'hidden' : 'visible',
+        gap: isFullscreen ? '8px' : '16px',
       }}
     >
       {/* Top Header & Stage Navigation Bar */}
@@ -177,67 +337,292 @@ export const ProjectorStageView = () => {
         alignItems: 'center',
         flexWrap: 'wrap',
         gap: '12px',
-        padding: isFullscreen ? '12px 20px' : '4px 0',
+        padding: isFullscreen ? '8px 20px' : '4px 0',
+        flexShrink: 0,
         borderRadius: isFullscreen ? '16px' : '0',
         background: isFullscreen ? 'rgba(15, 23, 42, 0.75)' : 'transparent',
         backdropFilter: isFullscreen ? 'blur(10px)' : 'none',
         border: isFullscreen ? '1px solid rgba(255, 255, 255, 0.08)' : 'none',
       }}>
-        {/* Left: Branding & Status */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <h2 style={{
-            fontSize: isFullscreen ? '22px' : '18px',
+        {/* Left: Branding & Round Selector (R1 & R2 prominent in BOTH Fullscreen & Normal mode) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          {!isFullscreen && (
+            <h2 style={{
+              fontSize: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              margin: 0,
+              letterSpacing: '0.04em',
+            }}>
+              <span>📽️</span> STAGE PROJECTOR
+            </h2>
+          )}
+
+          {/* R1 & R2 Round Switcher Buttons (Always visible in Fullscreen and Normal mode) */}
+          <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
-            margin: 0,
-            letterSpacing: '0.04em',
+            gap: '4px',
+            background: 'rgba(0, 0, 0, 0.65)',
+            padding: '3px 6px',
+            borderRadius: '12px',
+            border: '1.5px solid rgba(255, 255, 255, 0.16)',
+            boxShadow: '0 4px 15px rgba(0, 0, 0, 0.4)',
           }}>
-            <span>📽️</span> STAGE PROJECTOR
-          </h2>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span className="pill pill-purple" style={{ fontSize: '11.5px', padding: '4px 12px' }}>
-              ROUND {room ? room.currentRound : 1}
-            </span>
-            {room && (
-              <span className="pill pill-blue" style={{ fontSize: '11.5px', padding: '4px 12px' }}>
-                ARENA: <strong style={{ color: 'var(--winner-gold)' }}>{room.roomId}</strong>
-              </span>
-            )}
+            <button
+              onClick={() => switchRound(1)}
+              style={{
+                padding: isFullscreen ? '6px 16px' : '4px 12px',
+                borderRadius: '8px',
+                border: activeRound === 1 ? '1px solid #38BDF8' : 'none',
+                background: activeRound === 1 ? 'linear-gradient(135deg, #0284C7 0%, #4F46E5 100%)' : 'transparent',
+                color: activeRound === 1 ? '#FFFFFF' : 'rgba(255, 255, 255, 0.6)',
+                fontSize: isFullscreen ? '13px' : '11.5px',
+                fontWeight: 900,
+                letterSpacing: '0.05em',
+                cursor: 'pointer',
+                boxShadow: activeRound === 1 ? '0 0 14px rgba(56, 189, 248, 0.6)' : 'none',
+                transition: 'all 0.2s ease',
+              }}
+              title="Switch to Round 1 (R1: Movies, Hidden Category, Cartoon, Games)"
+            >
+              📁 R1
+            </button>
+            <button
+              onClick={() => switchRound(2)}
+              style={{
+                padding: isFullscreen ? '6px 16px' : '4px 12px',
+                borderRadius: '8px',
+                border: activeRound === 2 ? '1px solid #F59E0B' : 'none',
+                background: activeRound === 2 ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)' : 'transparent',
+                color: activeRound === 2 ? '#000000' : 'rgba(255, 255, 255, 0.6)',
+                fontSize: isFullscreen ? '13px' : '11.5px',
+                fontWeight: 900,
+                letterSpacing: '0.05em',
+                cursor: 'pointer',
+                boxShadow: activeRound === 2 ? '0 0 14px rgba(245, 158, 11, 0.6)' : 'none',
+                transition: 'all 0.2s ease',
+              }}
+              title="Switch to Round 2 (R2: Lyrics & Tamil Movies)"
+            >
+              🎬 R2
+            </button>
           </div>
+
+          {/* Category Tag */}
+          <span style={{
+            background: 'rgba(56, 189, 248, 0.15)',
+            color: 'var(--accent-cyan)',
+            border: '1.2px solid rgba(56, 189, 248, 0.35)',
+            padding: isFullscreen ? '6px 16px' : '4px 12px',
+            borderRadius: '24px',
+            fontSize: isFullscreen ? '13px' : '11.5px',
+            fontWeight: 900,
+            letterSpacing: '0.08em',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            boxShadow: '0 0 15px rgba(56, 189, 248, 0.2)',
+          }}>
+            <span>{categoryMeta.icon}</span>
+            <span>{categoryMeta.title.toUpperCase()}</span>
+          </span>
+
+          {!isFullscreen && room && (
+            <span className="pill pill-blue" style={{ fontSize: '11px', padding: '3px 10px' }}>
+              ARENA: <strong style={{ color: 'var(--winner-gold)' }}>{room.roomId}</strong>
+            </span>
+          )}
         </div>
 
-        {/* Right: Controls & Side Buzzer List Toggle Button */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        {/* Right: Category Tabs, Timer Badge, Controls & Side Buzzer List Toggle Button */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: isFullscreen ? '12px' : '8px', flexWrap: 'wrap' }}>
+          {/* Round 1 Category Quick-Jump Tabs (Movie, Hidden, Cartoon, Game) */}
+          {activeRound === 1 && !isFullscreen && (
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '3px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              padding: '2px 4px',
+              borderRadius: '8px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+            }}>
+              {[
+                { cat: 'Guess the Movie', icon: '🎬', label: 'Movie' },
+                { cat: 'Guess the Hidden Category', icon: '🔍', label: 'Hidden' },
+                { cat: 'Guess the Cartoon', icon: '🎨', label: 'Cartoon' },
+                { cat: 'Guess The Game', icon: '🎮', label: 'Game' },
+              ].map((item) => {
+                const isCurrent = currentCategory.toLowerCase().includes(item.label.toLowerCase());
+                return (
+                  <button
+                    key={item.cat}
+                    onClick={() => {
+                      const idx = questions.findIndex(q =>
+                        q.category === item.cat ||
+                        q.category.toLowerCase().includes(item.label.toLowerCase())
+                      );
+                      if (idx !== -1) {
+                        setActiveQuestion(idx);
+                        setCategoryTitleActive(false);
+                      }
+                    }}
+                    style={{
+                      padding: '4px 9px',
+                      borderRadius: '6px',
+                      border: isCurrent ? '1px solid var(--accent-cyan)' : 'none',
+                      background: isCurrent ? 'rgba(56, 189, 248, 0.25)' : 'transparent',
+                      color: isCurrent ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                      fontSize: '11px',
+                      fontWeight: isCurrent ? 900 : 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title={`Select and navigate to ${item.cat}`}
+                  >
+                    <span>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Category Title Slide Button */}
+          <button
+            onClick={() => setCategoryTitleActive((prev) => !prev)}
+            className={`btn btn-sm ${categoryTitleActive ? 'btn-primary pulsing-glow' : 'btn-outline'}`}
+            style={{
+              padding: isFullscreen ? '6px 12px' : '4px 10px',
+              fontSize: isFullscreen ? '12px' : '11.5px',
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+            }}
+            title="Toggle Category Title Slide (Key T)"
+          >
+            <span>🎬</span>
+            <span>{categoryTitleActive ? 'Exit Title' : 'Title Slide'}</span>
+            <span style={{ fontSize: '10px', opacity: 0.8, background: 'rgba(255,255,255,0.2)', padding: '1px 5px', borderRadius: '4px' }}>T</span>
+          </button>
+
+          {/* Live Clue Countdown Timer Pill (Prominent Seconds in Fullscreen) */}
+          {!categoryTitleActive && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: isFullscreen ? '10px' : '6px',
+              background: isFullscreen ? 'rgba(15, 23, 42, 0.85)' : 'rgba(0, 0, 0, 0.55)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              padding: isFullscreen ? '6px 18px' : '3px 10px',
+              borderRadius: isFullscreen ? '28px' : '20px',
+              border: `2px solid ${isTimerPaused ? 'var(--winner-gold)' : (timerRemaining <= 5 ? '#EF4444' : (timerRemaining <= 10 ? '#F59E0B' : 'var(--accent-cyan)'))}`,
+              boxShadow: isTimerPaused
+                ? '0 0 20px rgba(251, 191, 36, 0.45)'
+                : (timerRemaining <= 5 ? '0 0 22px rgba(239, 68, 68, 0.6)' : (isFullscreen ? '0 0 18px rgba(56, 189, 248, 0.3)' : 'none')),
+              transition: 'all 0.3s ease',
+            }}>
+              {isAnswerRevealed ? (
+                <span style={{ fontSize: isFullscreen ? '14px' : '11px', fontWeight: 900, color: 'var(--winner-gold)' }}>
+                  🏆 ANSWER
+                </span>
+              ) : isTimerPaused ? (
+                <span
+                  onClick={toggleTimerPause}
+                  style={{ fontSize: isFullscreen ? '14px' : '11px', fontWeight: 900, color: 'var(--winner-gold)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  title="Timer paused! Press P or click to resume"
+                >
+                  <span style={{ fontSize: isFullscreen ? '16px' : '12px' }}>⏸️</span>
+                  <span>PAUSED</span>
+                  <span style={{ fontSize: isFullscreen ? '10.5px' : '9.5px', opacity: 0.85 }}>(Key P)</span>
+                </span>
+              ) : (revealedClueCount === 4 && timerRemaining === 0) ? (
+                <span style={{ fontSize: isFullscreen ? '14px' : '11px', fontWeight: 900, color: 'var(--winner-gold)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>⏰ TIME'S UP</span>
+                  <span style={{ fontSize: isFullscreen ? '11px' : '9.5px', color: 'rgba(255,255,255,0.7)' }}>• Await Host</span>
+                </span>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: isFullscreen ? '8px' : '5px' }}>
+                  <span style={{
+                    fontSize: isFullscreen ? '22px' : '13px',
+                    fontWeight: 900,
+                    fontFamily: 'monospace',
+                    color: timerRemaining <= 5 ? '#EF4444' : (timerRemaining <= 10 ? '#F59E0B' : 'var(--accent-cyan)'),
+                    letterSpacing: '0.04em',
+                    textShadow: timerRemaining <= 5 ? '0 0 14px rgba(239, 68, 68, 0.8)' : (isFullscreen ? '0 0 12px rgba(56, 189, 248, 0.5)' : 'none'),
+                  }}>
+                    ⏱️ {timerRemaining}s
+                  </span>
+                  <span style={{
+                    fontSize: isFullscreen ? '12px' : '9.5px',
+                    color: 'rgba(255,255,255,0.5)',
+                    fontWeight: 700,
+                  }}>
+                    ({revealedClueCount === 1 ? '30s' : '15s'})
+                  </span>
+                </div>
+              )}
+
+              {/* Pause / Resume Button */}
+              {!isAnswerRevealed && !(revealedClueCount === 4 && timerRemaining === 0) && (
+                <button
+                  onClick={toggleTimerPause}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: isTimerPaused ? 'var(--winner-gold)' : 'rgba(255,255,255,0.8)',
+                    cursor: 'pointer',
+                    padding: '1px 3px',
+                    fontSize: isFullscreen ? '14px' : '11.5px',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                  title={isTimerPaused ? 'Resume Timer (Key P)' : 'Pause Timer (Key P)'}
+                >
+                  {isTimerPaused ? '▶️' : '⏸️'}
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Challenge Navigation */}
           <button
             onClick={handlePrevQuestion}
             disabled={activeQuestionIndex === 0}
             className="btn btn-secondary btn-sm"
-            title="Previous Challenge (←)"
+            style={{ fontWeight: 800 }}
+            title="Previous Question (←)"
           >
             ◀ Prev
           </button>
-          <span style={{ fontSize: '12.5px', fontWeight: 800, color: 'var(--accent-cyan)' }}>
-            CHALLENGE {activeQuestionIndex + 1} / {questions.length}
+          <span style={{ fontSize: '13px', fontWeight: 900, color: 'var(--accent-cyan)', minWidth: '40px', textAlign: 'center' }}>
+            Q{activeQuestionIndex + 1}/{questions.length}
           </span>
           <button
             onClick={handleNextQuestion}
             disabled={activeQuestionIndex >= questions.length - 1}
             className="btn btn-secondary btn-sm"
-            title="Next Challenge (→)"
+            style={{ fontWeight: 800 }}
+            title="Next Question (→)"
           >
             Next ▶
           </button>
 
-          {/* Reset Clues Button */}
+          {/* Reset to First Question Button */}
           <button
-            onClick={resetClues}
+            onClick={handleResetToFirstQuestion}
             className="btn btn-outline btn-sm"
-            title="Reset to Clue 1 (Key R)"
+            style={{ fontWeight: 800, borderColor: 'rgba(255, 255, 255, 0.25)' }}
+            title="Reset to First Question (Q1) from beginning (Key R)"
           >
-            🔄 Reset
+            🔄 Reset (Q1)
           </button>
 
           {/* THE BUZZER LIST TOGGLE BUTTON:
@@ -251,20 +636,21 @@ export const ProjectorStageView = () => {
               letterSpacing: '0.05em',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              padding: '8px 16px',
+              gap: '6px',
+              padding: '6px 12px',
+              fontSize: '11.5px',
             }}
             title="Toggle Buzzer Press List on the side (Key B)"
           >
             <span>{showBuzzerList ? '✕' : '⚡'}</span>
-            <span>{showBuzzerList ? 'Hide Buzzer List' : 'Buzzer List'}</span>
+            <span>{showBuzzerList ? 'Hide Buzzer' : 'Buzzer'}</span>
             {queue.length > 0 && (
               <span style={{
                 background: showBuzzerList ? 'rgba(255,255,255,0.2)' : '#000000',
                 color: showBuzzerList ? '#FFFFFF' : 'var(--winner-gold)',
-                padding: '2px 7px',
+                padding: '1px 6px',
                 borderRadius: '10px',
-                fontSize: '11px',
+                fontSize: '10.5px',
                 fontWeight: 900,
               }}>
                 {queue.length}
@@ -276,7 +662,7 @@ export const ProjectorStageView = () => {
           <button
             onClick={toggleFullscreen}
             className="btn btn-outline btn-sm"
-            style={{ color: '#FFFFFF', borderColor: 'rgba(255,255,255,0.2)' }}
+            style={{ color: '#FFFFFF', borderColor: 'rgba(255,255,255,0.2)', padding: '4px 10px', fontSize: '11.5px' }}
             title="Toggle Fullscreen (Key F)"
           >
             {isFullscreen ? '🗗 Exit' : '⛶ Fullscreen'}
@@ -294,44 +680,177 @@ export const ProjectorStageView = () => {
         width: '100%',
         position: 'relative',
         alignItems: 'stretch',
-        minHeight: isFullscreen ? 'calc(100vh - 100px)' : '620px',
+        minHeight: isFullscreen ? '0' : '620px',
+        overflow: 'hidden',
       }}>
         {/* ============================================================ */}
         {/* 1. MAIN SCREEN: FOCUS ONLY ON QUESTION / CLUES              */}
         {/*    Occupies entire screen by default                         */}
         {/* ============================================================ */}
         <div
-          className="glass-card"
+          className="glass-card liquid-glass-stage"
           style={{
             flex: 1,
             width: showBuzzerList ? 'calc(100% - 390px)' : '100%',
             transition: 'all 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-            padding: isFullscreen ? '36px 48px' : '28px 36px',
-            background: 'radial-gradient(circle at 50% 15%, #151F38 0%, #0B101C 85%)',
-            border: '2px solid rgba(99, 102, 241, 0.4)',
-            boxShadow: '0 25px 70px rgba(0, 0, 0, 0.75)',
+            padding: isFullscreen ? '16px 28px' : '28px 36px',
+            overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
           }}
         >
-          {/* Header Info Inside Stage */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-            paddingBottom: '14px',
-          }}>
+          {categoryTitleActive ? (
+            /* ============================================================ */
+            /* CATEGORY TITLE COVER SLIDE (Round 1)                         */
+            /* Pure title slide: Not a question, not a clue!               */
+            /* ============================================================ */
             <div style={{
-              fontSize: '13px',
-              fontWeight: 900,
-              letterSpacing: '0.15em',
-              color: 'var(--accent-cyan)',
-              textTransform: 'uppercase',
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              textAlign: 'center',
+              padding: isFullscreen ? '40px 60px' : '24px 30px',
+              animation: 'fadeIn 0.4s ease',
+              width: '100%',
+              margin: 'auto 0',
             }}>
-              CHALLENGE #{activeQuestionIndex + 1} OF {questions.length}
+              {/* Category Pill */}
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 24px',
+                borderRadius: '30px',
+                background: 'rgba(56, 189, 248, 0.15)',
+                border: '1.5px solid rgba(56, 189, 248, 0.4)',
+                color: 'var(--accent-cyan)',
+                fontSize: isFullscreen ? '15px' : '13px',
+                fontWeight: 900,
+                letterSpacing: '0.2em',
+                textTransform: 'uppercase',
+                marginBottom: isFullscreen ? '28px' : '20px',
+                boxShadow: '0 0 25px rgba(56, 189, 248, 0.25)',
+              }}>
+                <span>⭐</span> ROUND 1 • {categoryMeta.subtitle}
+              </div>
+
+              {/* Large Animated Icon */}
+              <div style={{
+                fontSize: isFullscreen ? '96px' : '72px',
+                marginBottom: isFullscreen ? '20px' : '16px',
+                filter: 'drop-shadow(0 0 35px rgba(99, 102, 241, 0.7))',
+                lineHeight: 1,
+              }}>
+                {categoryMeta.icon}
+              </div>
+
+              {/* Main Category Title */}
+              <h1 style={{
+                fontFamily: 'var(--font-heading)',
+                fontSize: isFullscreen ? '58px' : '44px',
+                fontWeight: 900,
+                color: '#FFFFFF',
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                margin: '0 0 16px 0',
+                background: 'linear-gradient(135deg, #FFFFFF 20%, #38BDF8 60%, #818CF8 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                textShadow: '0 10px 40px rgba(56, 189, 248, 0.3)',
+                lineHeight: 1.2,
+              }}>
+                {categoryMeta.title}
+              </h1>
+
+              {/* Category Description */}
+              <p style={{
+                fontSize: isFullscreen ? '21px' : '17px',
+                color: 'rgba(255, 255, 255, 0.78)',
+                maxWidth: '720px',
+                lineHeight: 1.6,
+                margin: '0 0 36px 0',
+                fontWeight: 500,
+              }}>
+                {categoryMeta.description}
+              </p>
+
+              {/* Start Category Button */}
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <button
+                  onClick={() => setCategoryTitleActive(false)}
+                  className="btn btn-primary pulsing-glow"
+                  style={{
+                    padding: isFullscreen ? '16px 44px' : '14px 34px',
+                    fontSize: isFullscreen ? '18px' : '15px',
+                    fontWeight: 900,
+                    letterSpacing: '0.08em',
+                    borderRadius: '16px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    boxShadow: '0 12px 35px rgba(99, 102, 241, 0.55)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span>▶</span> START {categoryMeta.title.toUpperCase()}
+                  <span style={{
+                    fontSize: '11px',
+                    opacity: 0.85,
+                    padding: '2px 8px',
+                    background: 'rgba(255, 255, 255, 0.25)',
+                    borderRadius: '6px',
+                  }}>
+                    SPACE
+                  </span>
+                </button>
+              </div>
+
+              <div style={{
+                marginTop: '26px',
+                fontSize: '12.5px',
+                color: 'var(--text-muted)',
+                fontWeight: 700,
+                letterSpacing: '0.05em',
+                display: 'flex',
+                gap: '16px',
+                flexWrap: 'wrap',
+                justifyContent: 'center',
+              }}>
+                <span>⏱️ Clue 1: 30s</span>
+                <span>•</span>
+                <span>⏱️ Clues 2-4: 15s</span>
+                <span>•</span>
+                <span>⏸️ Press 'P' to Pause Timer</span>
+                <span>•</span>
+                <span>🏆 Answer: Host Reveal</span>
+              </div>
             </div>
+          ) : (
+            <>
+              {/* Header Info Inside Stage */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                paddingBottom: '14px',
+              }}>
+                <div style={{
+                  fontSize: '13px',
+                  fontWeight: 900,
+                  letterSpacing: '0.15em',
+                  color: 'var(--accent-cyan)',
+                  textTransform: 'uppercase',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}>
+                  <span>{categoryMeta.icon}</span>
+                  <span>{currentCategory.toUpperCase()} • CHALLENGE #{activeQuestionIndex + 1} OF {questions.length}</span>
+                </div>
 
             <div style={{
               display: 'flex',
@@ -373,309 +892,543 @@ export const ProjectorStageView = () => {
             </div>
           </div>
 
-          {/* 4 Progressive Clue Boxes — Full Screen Width */}
+          {/* ── SINGLE ACTIVE CLUE / REVEALED ANSWER — FULLSCREEN DISPLAY ── */}
           <div style={{
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
-            gap: isFullscreen ? '18px' : '14px',
-            margin: '20px 0',
+            alignItems: 'center',
             width: '100%',
+            minHeight: 0,
+            overflowY: 'auto',
+            position: 'relative',
+            perspective: '1200px',
+            transformStyle: 'preserve-3d',
+            margin: isFullscreen ? '6px 0' : '14px 0',
           }}>
-            {clues.map((clueText, idx) => {
-              const clueNumber = idx + 1;
-              const isRevealed = revealedClueCount >= clueNumber;
-              const isCurrentActive = idx === revealedClueCount - 1;
+            {isAnswerRevealed ? (
+              /* ── HEROIC LIQUID FINAL ANSWER DISPLAY ── */
+              <div 
+                className="stage-card-flip liquid-answer-stage"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '100%',
+                  height: '100%',
+                  maxHeight: '100%',
+                  padding: isFullscreen ? '16px 24px' : '16px 20px',
+                  borderRadius: '20px',
+                  textAlign: 'center',
+                  boxSizing: 'border-box',
+                  overflowY: 'auto',
+                }}>
+                <div style={{
+                  fontSize: isFullscreen ? '13px' : '11px',
+                  fontWeight: 900,
+                  letterSpacing: '0.22em',
+                  color: 'var(--winner-gold)',
+                  marginBottom: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}>
+                  <span>🏆</span> FINAL ANSWER REVEALED
+                </div>
+                
+                <div style={{
+                  fontFamily: 'var(--font-heading)',
+                  fontSize: isFullscreen ? '38px' : '28px',
+                  fontWeight: 900,
+                  color: '#FFFFFF',
+                  letterSpacing: '0.04em',
+                  textShadow: '0 0 25px rgba(251, 191, 36, 0.8)',
+                  lineHeight: 1.2,
+                  marginBottom: currentQ.answerImage ? '12px' : '0',
+                }}>
+                  {answer}
+                </div>
 
+                {currentQ.answerImage && (
+                  <div style={{
+                    flex: 1,
+                    minHeight: 0,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    width: '100%',
+                    overflow: 'hidden',
+                  }}>
+                    <img
+                      src={currentQ.answerImage}
+                      alt="Revealed Answer"
+                      onClick={() => setFullscreenImage({
+                        url: currentQ.answerImage,
+                        clueNumber: 0,
+                        clueText: `Final Answer: ${answer}`,
+                      })}
+                      style={{
+                        maxWidth: '100%',
+                        maxHeight: isFullscreen ? '35vh' : '220px',
+                        objectFit: 'contain',
+                        borderRadius: '12px',
+                        boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
+                        border: '2px solid rgba(251, 191, 36, 0.4)',
+                        cursor: 'zoom-in',
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            ) : revealedClueCount === 0 ? (
+              /* ── No clues revealed yet — "Ready" state ── */
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '20px',
+                animation: 'fadeIn 0.4s ease',
+              }}>
+                <div style={{
+                  fontSize: isFullscreen ? '64px' : '48px',
+                  opacity: 0.3,
+                }}>
+                  🔍
+                </div>
+                <div style={{
+                  fontSize: isFullscreen ? '28px' : '22px',
+                  fontWeight: 800,
+                  color: 'rgba(255, 255, 255, 0.35)',
+                  letterSpacing: '0.08em',
+                  textAlign: 'center',
+                }}>
+                  CHALLENGE #{activeQuestionIndex + 1} READY
+                </div>
+                <div style={{
+                  fontSize: isFullscreen ? '16px' : '14px',
+                  color: 'rgba(255, 255, 255, 0.2)',
+                  textAlign: 'center',
+                }}>
+                  Press the button below or hit [Space] to reveal Clue 1
+                </div>
+              </div>
+            ) : (() => {
+              /* ── Show the CURRENT ACTIVE clue fullscreen ── */
+              const activeIdx = revealedClueCount - 1;
+              const activeClueText = clues[activeIdx];
+              const activeClueImage = clueImages[activeIdx];
+              const activeClueNumber = revealedClueCount;
+
+              if (activeClueImage) {
+                /* ── Clue WITH image: image fills entire area, text at bottom ── */
+                return (
+                  <div
+                    key={`clue-card-${activeClueNumber}-${activeIdx}`}
+                    className="stage-card-flip liquid-image-reveal"
+                    onClick={() => setFullscreenImage({
+                      url: activeClueImage,
+                      clueNumber: activeClueNumber,
+                      clueText: activeClueText,
+                    })}
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      borderRadius: '16px',
+                      overflow: 'hidden',
+                      cursor: 'zoom-in',
+                    }}
+                  >
+                    {/* Background image fills the entire area */}
+                    <img
+                      src={activeClueImage}
+                      alt={`Clue #${activeClueNumber} Visual`}
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        display: 'block',
+                      }}
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+
+                    {/* Gradient overlay at bottom for text readability */}
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      background: 'linear-gradient(to top, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.6) 50%, transparent 100%)',
+                      padding: isFullscreen ? '60px 32px 24px 32px' : '50px 24px 20px 24px',
+                      display: 'flex',
+                      alignItems: 'flex-end',
+                      gap: '16px',
+                    }}>
+                      {/* Clue badge */}
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        padding: isFullscreen ? '10px 18px' : '8px 14px',
+                        borderRadius: '12px',
+                        background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        flexShrink: 0,
+                        boxShadow: '0 4px 15px rgba(0, 0, 0, 0.5)',
+                      }}>
+                        <span style={{
+                          fontSize: isFullscreen ? '13px' : '11px',
+                          fontWeight: 900,
+                          letterSpacing: '0.14em',
+                          color: '#FFFFFF',
+                        }}>
+                          CLUE {activeClueNumber} OF 4
+                        </span>
+                      </div>
+
+                      {/* Clue text */}
+                      <div style={{
+                        flex: 1,
+                        fontSize: isFullscreen ? '22px' : '17px',
+                        color: '#FFFFFF',
+                        lineHeight: 1.45,
+                        fontWeight: 600,
+                        textShadow: '0 2px 10px rgba(0, 0, 0, 0.9)',
+                      }}>
+                        {activeClueText}
+                      </div>
+
+                      {/* Fullscreen hint */}
+                      <div style={{
+                        flexShrink: 0,
+                        background: 'rgba(0, 0, 0, 0.6)',
+                        backdropFilter: 'blur(8px)',
+                        WebkitBackdropFilter: 'blur(8px)',
+                        border: '1px solid rgba(56, 189, 248, 0.5)',
+                        borderRadius: '8px',
+                        padding: '6px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        color: 'var(--accent-cyan)',
+                        fontSize: '11px',
+                        fontWeight: 900,
+                      }}>
+                        <span>⛶</span> EXPAND (X)
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              /* ── Clue WITHOUT image: centered text fullscreen ── */
               return (
                 <div
-                  key={idx}
+                  key={`clue-card-txt-${activeClueNumber}-${activeIdx}`}
+                  className="stage-card-flip liquid-cinematic-in liquid-glass-stage"
+                  onClick={() => setFullscreenImage({
+                    url: '',
+                    clueNumber: activeClueNumber,
+                    clueText: activeClueText,
+                  })}
                   style={{
-                    padding: isFullscreen ? '22px 28px' : '16px 22px',
-                    borderRadius: '16px',
-                    background: isRevealed
-                      ? (isCurrentActive
-                          ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%)'
-                          : 'linear-gradient(135deg, rgba(20, 29, 47, 0.85) 0%, rgba(10, 16, 30, 0.9) 100%)')
-                      : 'rgba(255, 255, 255, 0.02)',
-                    border: isRevealed
-                      ? (isCurrentActive
-                          ? '2.5px solid var(--accent-cyan)'
-                          : '1.5px solid rgba(99, 102, 241, 0.45)')
-                      : '1.5px dashed rgba(255, 255, 255, 0.1)',
-                    boxShadow: isRevealed
-                      ? (isCurrentActive
-                          ? '0 0 30px rgba(56, 189, 248, 0.28), 0 10px 25px rgba(0, 0, 0, 0.5)'
-                          : '0 4px 15px rgba(0, 0, 0, 0.35)')
-                      : 'none',
-                    transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: isFullscreen ? '24px' : '18px',
-                  }}
-                >
-                  {/* Clue Index Badge */}
-                  <div style={{
-                    minWidth: isFullscreen ? '110px' : '95px',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    padding: isFullscreen ? '10px 14px' : '8px 12px',
-                    borderRadius: '12px',
-                    background: isRevealed
-                      ? (isCurrentActive
-                          ? 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)'
-                          : 'linear-gradient(135deg, #4F46E5 0%, #4338CA 100%)')
-                      : 'rgba(255, 255, 255, 0.04)',
-                    border: isRevealed ? '1px solid rgba(255, 255, 255, 0.25)' : '1px solid rgba(255, 255, 255, 0.05)',
+                    gap: isFullscreen ? '24px' : '18px',
+                    width: '100%',
+                    maxWidth: '900px',
+                    padding: '24px 30px',
+                    borderRadius: '20px',
+                    cursor: 'zoom-in',
+                    transition: 'all 0.25s ease',
+                  }}
+                  title="Click to view full screen (⛶ Expand)"
+                >
+                  {/* Clue number badge & Expand hint */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
                   }}>
-                    <span style={{
-                      fontSize: isFullscreen ? '12px' : '11px',
-                      fontWeight: 900,
-                      letterSpacing: '0.14em',
-                      color: isRevealed ? '#FFFFFF' : 'var(--text-muted)',
+                    <div style={{
+                      padding: isFullscreen ? '10px 22px' : '8px 18px',
+                      borderRadius: '14px',
+                      background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      boxShadow: '0 4px 20px rgba(3, 105, 161, 0.5)',
                     }}>
-                      CLUE #{clueNumber}
-                    </span>
-                    <span style={{
-                      fontSize: '9.5px',
-                      fontWeight: 800,
-                      marginTop: '3px',
-                      color: isRevealed ? '#BAE6FD' : 'rgba(255, 255, 255, 0.25)',
-                    }}>
-                      {isRevealed ? '✓ REVEALED' : '🔒 HIDDEN'}
-                    </span>
-                  </div>
-
-                  {/* Clue Content */}
-                  <div style={{ flex: 1 }}>
-                    {isRevealed ? (
-                      <div style={{
-                        fontSize: isFullscreen ? '20px' : '17px',
-                        color: '#FFFFFF',
-                        lineHeight: 1.5,
-                        fontWeight: 600,
-                        letterSpacing: '0.01em',
-                        animation: 'fadeIn 0.35s ease',
-                      }}>
-                        {clueText}
-                      </div>
-                    ) : (
-                      <div style={{
-                        fontSize: isFullscreen ? '16px' : '14px',
-                        color: 'rgba(255, 255, 255, 0.25)',
-                        fontStyle: 'italic',
-                      }}>
-                        Clue #{clueNumber} is currently hidden. Press the button below to reveal...
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Clue Visual Image if revealed & present */}
-                  {isRevealed && clueImages[idx] && (
-                    <div
-                      onClick={() => setFullscreenImage({
-                        url: clueImages[idx],
-                        clueNumber,
-                        clueText,
-                      })}
-                      style={{
-                        position: 'relative',
-                        borderRadius: '14px',
-                        overflow: 'hidden',
-                        border: isCurrentActive ? '2.5px solid var(--accent-cyan)' : '2px solid rgba(56, 189, 248, 0.6)',
-                        boxShadow: isCurrentActive
-                          ? '0 8px 30px rgba(56, 189, 248, 0.35), 0 0 20px rgba(0, 0, 0, 0.6)'
-                          : '0 6px 20px rgba(0, 0, 0, 0.5)',
-                        flexShrink: 0,
-                        cursor: 'zoom-in',
-                        animation: 'fadeIn 0.4s ease',
-                        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-                      }}
-                      title="Click to view full screen image"
-                    >
-                      <img
-                        src={clueImages[idx]}
-                        alt={`Clue #${clueNumber} Visual`}
-                        style={{
-                          width: isCurrentActive ? (isFullscreen ? '260px' : '200px') : (isFullscreen ? '180px' : '140px'),
-                          height: isCurrentActive ? (isFullscreen ? '170px' : '130px') : (isFullscreen ? '115px' : '90px'),
-                          objectFit: 'cover',
-                          display: 'block',
-                        }}
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                        }}
-                      />
-                      <div style={{
-                        position: 'absolute',
-                        bottom: '4px',
-                        right: '4px',
-                        background: 'rgba(0, 0, 0, 0.82)',
-                        color: 'var(--accent-cyan)',
-                        padding: '2px 7px',
-                        borderRadius: '6px',
-                        fontSize: '9.5px',
+                      <span style={{
+                        fontSize: isFullscreen ? '16px' : '13px',
                         fontWeight: 900,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        border: '1px solid rgba(56, 189, 248, 0.4)',
+                        letterSpacing: '0.14em',
+                        color: '#FFFFFF',
                       }}>
-                        <span>⛶</span> FULLSCREEN
-                      </div>
+                        CLUE {activeClueNumber} OF 4
+                      </span>
                     </div>
-                  )}
 
-                  {/* Status Indicator Icon */}
-                  <div style={{ fontSize: isFullscreen ? '26px' : '22px', flexShrink: 0 }}>
-                    {isRevealed ? '💡' : '🔒'}
+                    <div style={{
+                      background: 'rgba(0, 0, 0, 0.5)',
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(56, 189, 248, 0.4)',
+                      color: 'var(--accent-cyan)',
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}>
+                      <span>⛶</span> EXPAND (X)
+                    </div>
+                  </div>
+
+                  {/* Clue text — large and centered */}
+                  <div style={{
+                    fontSize: isFullscreen ? '32px' : '24px',
+                    color: '#FFFFFF',
+                    lineHeight: 1.5,
+                    fontWeight: 700,
+                    textAlign: 'center',
+                    letterSpacing: '0.01em',
+                  }}>
+                    {activeClueText}
+                  </div>
+
+                  {/* Progress dots */}
+                  <div style={{
+                    display: 'flex',
+                    gap: '10px',
+                    marginTop: '8px',
+                  }}>
+                    {[1, 2, 3, 4].map(n => (
+                      <div key={n} style={{
+                        width: isFullscreen ? '12px' : '10px',
+                        height: isFullscreen ? '12px' : '10px',
+                        borderRadius: '50%',
+                        background: n <= revealedClueCount
+                          ? 'var(--accent-cyan)'
+                          : 'rgba(255, 255, 255, 0.15)',
+                        border: n === activeClueNumber
+                          ? '2px solid #FFFFFF'
+                          : '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: n <= revealedClueCount
+                          ? '0 0 10px rgba(56, 189, 248, 0.5)'
+                          : 'none',
+                        transition: 'all 0.3s ease',
+                      }} />
+                    ))}
                   </div>
                 </div>
               );
-            })}
+            })()}
           </div>
 
-          {/* Final Revealed Answer Banner (Shown after all 4 clues and user clicks Reveal Answer) */}
-          {isAnswerRevealed && (
-            <div style={{
-              margin: '0 0 20px 0',
-              width: '100%',
-              padding: isFullscreen ? '28px 36px' : '20px 28px',
-              borderRadius: '20px',
-              background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.22) 0%, rgba(217, 119, 6, 0.28) 100%)',
-              border: '2.5px solid var(--winner-gold)',
-              boxShadow: '0 0 50px rgba(251, 191, 36, 0.45)',
-              textAlign: 'center',
-              animation: 'fadeIn 0.5s ease',
-            }}>
-              <div style={{
-                fontSize: '13px',
-                fontWeight: 900,
-                letterSpacing: '0.22em',
-                color: 'var(--winner-gold)',
-                marginBottom: '6px',
-              }}>
-                🏆 FINAL ANSWER REVEALED
-              </div>
-              <div style={{
-                fontFamily: 'var(--font-heading)',
-                fontSize: isFullscreen ? '44px' : '36px',
-                fontWeight: 900,
-                color: '#FFFFFF',
-                letterSpacing: '0.04em',
-                textShadow: '0 0 30px rgba(251, 191, 36, 0.7)',
-              }}>
-                {answer}
-              </div>
-            </div>
-          )}
-
-          {/* Action Button: Clue 1 -> Clue 2 -> Clue 3 -> Clue 4 -> Reveal Answer */}
+          {/* Action Buttons: Compact & Sleek with Keyboard Shortcut Badges */}
           <div style={{
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
-            gap: '12px',
+            justifyContent: 'center',
+            gap: '10px',
             borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-            paddingTop: '18px',
+            paddingTop: isFullscreen ? '8px' : '14px',
+            flexShrink: 0,
+            flexWrap: 'wrap',
           }}>
             {revealedClueCount < 4 ? (
-              <button
-                onClick={revealNextClue}
-                className="btn btn-primary pulsing-glow"
-                style={{
-                  padding: isFullscreen ? '20px 56px' : '16px 44px',
-                  fontSize: isFullscreen ? '20px' : '17px',
-                  fontWeight: 900,
-                  letterSpacing: '0.08em',
-                  borderRadius: '16px',
-                  background: 'linear-gradient(135deg, #0284C7 0%, #4F46E5 100%)',
-                  boxShadow: '0 8px 30px rgba(79, 70, 229, 0.45)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  cursor: 'pointer',
-                }}
-              >
-                <span>🔍</span> REVEAL CLUE {revealedClueCount + 1}
-              </button>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <button
+                  onClick={revealNextClue}
+                  className="btn btn-primary pulsing-glow"
+                  style={{
+                    padding: isFullscreen ? '10px 24px' : '9px 20px',
+                    fontSize: isFullscreen ? '14px' : '13.5px',
+                    fontWeight: 800,
+                    letterSpacing: '0.04em',
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #0284C7 0%, #4F46E5 100%)',
+                    boxShadow: '0 4px 20px rgba(79, 70, 229, 0.35)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                  }}
+                  title="Reveal next visual clue (Shortcut: Space or →)"
+                >
+                  <span>🔍 Reveal Clue {revealedClueCount + 1}</span>
+                  <span style={{ fontSize: '10px', opacity: 0.85, background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px' }}>Space</span>
+                </button>
+
+                <button
+                  onClick={() => revealAnswer(true)}
+                  className="btn btn-warning"
+                  style={{
+                    padding: isFullscreen ? '10px 22px' : '9px 18px',
+                    fontSize: isFullscreen ? '14px' : '13.5px',
+                    fontWeight: 800,
+                    letterSpacing: '0.04em',
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                    color: '#000000',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                  }}
+                  title="Instantly reveal the final answer (Shortcut: Key A)"
+                >
+                  <span>🎉 Reveal Answer</span>
+                  <span style={{ fontSize: '10px', opacity: 0.9, background: 'rgba(0,0,0,0.35)', color: '#FFFFFF', padding: '2px 6px', borderRadius: '4px' }}>Key A</span>
+                </button>
+              </div>
             ) : !isAnswerRevealed ? (
-              <button
-                onClick={() => revealAnswer(true)}
-                className="btn btn-warning pulsing-glow"
-                style={{
-                  padding: isFullscreen ? '20px 60px' : '16px 48px',
-                  fontSize: isFullscreen ? '21px' : '18px',
-                  fontWeight: 900,
-                  letterSpacing: '0.08em',
-                  borderRadius: '16px',
-                  background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-                  color: '#000000',
-                  boxShadow: '0 8px 35px rgba(245, 158, 11, 0.55)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  cursor: 'pointer',
-                }}
-              >
-                <span>🎉</span> REVEAL FINAL ANSWER
-              </button>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <button
+                  onClick={() => revealAnswer(true)}
+                  className="btn btn-warning pulsing-glow"
+                  style={{
+                    padding: isFullscreen ? '12px 30px' : '10px 24px',
+                    fontSize: isFullscreen ? '15px' : '14px',
+                    fontWeight: 900,
+                    letterSpacing: '0.05em',
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                    color: '#000000',
+                    boxShadow: '0 4px 25px rgba(245, 158, 11, 0.45)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                  }}
+                  title="Reveal Final Answer (Shortcut: Key A or Space)"
+                >
+                  <span>🎉 REVEAL FINAL ANSWER</span>
+                  <span style={{ fontSize: '10.5px', opacity: 0.9, background: 'rgba(0,0,0,0.35)', color: '#FFFFFF', padding: '2px 6px', borderRadius: '4px' }}>Key A / Space</span>
+                </button>
+              </div>
             ) : (
-              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
                 <button
                   onClick={resetClues}
-                  className="btn btn-secondary btn-lg"
-                  style={{ padding: '14px 28px', fontSize: '15px' }}
+                  className="btn btn-secondary btn-sm"
+                  style={{ padding: '8px 18px', fontSize: '12.5px', borderRadius: '8px' }}
+                  title="Reset to Clue 1 (Shortcut: Key R)"
                 >
-                  🔄 REPLAY CLUES
+                  🔄 Replay (Key R)
                 </button>
                 {activeQuestionIndex < questions.length - 1 ? (
                   <button
                     onClick={handleNextQuestion}
-                    className="btn btn-primary btn-lg"
+                    className="btn btn-primary btn-sm pulsing-glow"
                     style={{
-                      padding: '14px 36px',
-                      fontSize: '16px',
+                      padding: '9px 24px',
+                      fontSize: '13.5px',
+                      fontWeight: 800,
+                      borderRadius: '10px',
                       background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: '0 4px 18px rgba(16, 185, 129, 0.4)',
                     }}
+                    title="Next Challenge (Shortcut: Space or →)"
                   >
-                    ⏭️ NEXT CHALLENGE ({activeQuestionIndex + 2}/{questions.length})
+                    <span>
+                      {questions[activeQuestionIndex + 1]?.category !== questions[activeQuestionIndex]?.category
+                        ? `⏭️ Next Set: ${questions[activeQuestionIndex + 1]?.category} (${activeQuestionIndex + 2}/${questions.length})`
+                        : `⏭️ Next Challenge (${activeQuestionIndex + 2}/${questions.length})`}
+                    </span>
+                    <span style={{ fontSize: '10.5px', opacity: 0.85, background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px' }}>→</span>
                   </button>
+                ) : activeRound === 1 ? (
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <button
+                      onClick={() => switchRound(2)}
+                      className="btn btn-warning pulsing-gold-badge"
+                      style={{
+                        padding: '11px 28px',
+                        fontSize: '14px',
+                        fontWeight: 900,
+                        letterSpacing: '0.04em',
+                        borderRadius: '12px',
+                        background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                        color: '#000000',
+                        boxShadow: '0 6px 28px rgba(245, 158, 11, 0.55)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        cursor: 'pointer',
+                      }}
+                      title="Completed Round 1! Proceed to Round 2 (Relics & Demo)"
+                    >
+                      <span>🚀 PROCEED TO ROUND 2 (Relics & Demo) ▶</span>
+                    </button>
+                    <button
+                      onClick={() => setActiveQuestion(0)}
+                      className="btn btn-secondary btn-sm"
+                      style={{ padding: '9px 18px', fontSize: '12px', borderRadius: '8px' }}
+                    >
+                      🔄 Replay Round 1
+                    </button>
+                  </div>
                 ) : (
-                  <button
-                    onClick={() => setActiveQuestion(0)}
-                    className="btn btn-primary btn-lg"
-                    style={{ padding: '14px 36px', fontSize: '16px' }}
-                  >
-                    🎉 RESTART FROM CHALLENGE 1
-                  </button>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <button
+                      onClick={() => setActiveQuestion(0)}
+                      className="btn btn-success pulsing-glow"
+                      style={{
+                        padding: '11px 28px',
+                        fontSize: '14px',
+                        fontWeight: 900,
+                        borderRadius: '12px',
+                        background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                        color: '#FFFFFF',
+                      }}
+                    >
+                      🏆 ALL ROUNDS COMPLETED!
+                    </button>
+                    <button
+                      onClick={() => setActiveQuestion(0)}
+                      className="btn btn-secondary btn-sm"
+                      style={{ padding: '9px 18px', fontSize: '12px', borderRadius: '8px' }}
+                    >
+                      🔄 Replay Round 2
+                    </button>
+                  </div>
                 )}
               </div>
             )}
 
-            {/* Subtext info */}
+            {/* Keyboard shortcuts helper legend */}
             <div style={{
-              fontSize: '12px',
+              fontSize: '11px',
               color: 'var(--text-muted)',
               display: 'flex',
+              gap: '12px',
               alignItems: 'center',
-              gap: '14px',
               flexWrap: 'wrap',
               justifyContent: 'center',
+              width: '100%',
+              marginTop: '4px',
             }}>
-              <span>
-                <strong>Progress:</strong> Clue {revealedClueCount} / 4
-              </span>
-              <span style={{ opacity: 0.4 }}>•</span>
-              <span style={{ color: 'var(--accent-cyan)' }}>
-                [Space] or [→] Next Clue &bull; [B] Toggle Buzzer Side List &bull; [F] Fullscreen
-              </span>
+              <span>⌨️ Shortcuts: <strong style={{ color: 'var(--accent-cyan)' }}>Space / →</strong> Next Clue</span>
+              <span>• <strong style={{ color: 'var(--winner-gold)' }}>[A]</strong> Reveal Answer</span>
+              <span>• <strong style={{ color: 'var(--accent-primary)' }}>←</strong> Prev</span>
+              <span>• <strong style={{ color: 'var(--accent-cyan)' }}>[B]</strong> Buzzer List</span>
+              <span>• <strong style={{ color: 'var(--accent-cyan)' }}>[F]</strong> Fullscreen</span>
             </div>
           </div>
-        </div>
+        </>
+      )}
+    </div>
 
         {/* ============================================================ */}
         {/* 2. SIDEBAR: BUZZER-PRESSED USER LIST                          */}
@@ -800,71 +1553,252 @@ export const ProjectorStageView = () => {
               ) : (
                 queue.map((entry, idx) => {
                   const isFirst = entry.rank === 1;
+                  const isSecond = entry.rank === 2;
+                  const isThird = entry.rank === 3;
+                  const teamId = entry.participantId || entry.name;
+                  const isSelected = selectedTeamIdForPoints === teamId;
+                  const currentScore = teamScores && teamScores[teamId] ? teamScores[teamId].score : 0;
+
+                  // Styling for Top 3 vs standard ranks
+                  const itemBg = isFirst
+                    ? 'linear-gradient(135deg, rgba(251, 191, 36, 0.24) 0%, rgba(217, 119, 6, 0.16) 100%)'
+                    : isSecond
+                    ? 'linear-gradient(135deg, rgba(226, 232, 240, 0.2) 0%, rgba(148, 163, 184, 0.12) 100%)'
+                    : isThird
+                    ? 'linear-gradient(135deg, rgba(217, 119, 6, 0.2) 0%, rgba(180, 83, 9, 0.14) 100%)'
+                    : 'rgba(255, 255, 255, 0.04)';
+
+                  const itemBorder = isFirst
+                    ? '2px solid var(--winner-gold)'
+                    : isSecond
+                    ? '2px solid #CBD5E1'
+                    : isThird
+                    ? '2px solid #CD7F32'
+                    : '1px solid rgba(255, 255, 255, 0.08)';
+
+                  const itemGlow = isFirst
+                    ? '0 0 22px rgba(251, 191, 36, 0.35)'
+                    : isSecond
+                    ? '0 0 16px rgba(203, 213, 225, 0.25)'
+                    : isThird
+                    ? '0 0 16px rgba(205, 127, 50, 0.25)'
+                    : 'none';
+
+                  const rankBg = isFirst
+                    ? 'var(--winner-gold)'
+                    : isSecond
+                    ? '#E2E8F0'
+                    : isThird
+                    ? '#CD7F32'
+                    : 'rgba(255, 255, 255, 0.1)';
+
+                  const rankColor = isFirst || isSecond ? '#000000' : '#FFFFFF';
 
                   return (
                     <div
-                      key={entry.participantId || idx}
+                      key={teamId || idx}
+                      onClick={() => setSelectedTeamIdForPoints(isSelected ? null : teamId)}
                       style={{
                         display: 'flex',
-                        alignItems: 'center',
+                        flexDirection: 'column',
                         padding: '12px 14px',
                         borderRadius: '12px',
-                        background: isFirst
-                          ? 'linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(217, 119, 6, 0.15) 100%)'
-                          : 'rgba(255, 255, 255, 0.04)',
-                        border: isFirst
-                          ? '1.8px solid var(--winner-gold)'
-                          : '1px solid rgba(255, 255, 255, 0.08)',
-                        boxShadow: isFirst
-                          ? '0 0 20px rgba(251, 191, 36, 0.3)'
-                          : 'none',
+                        background: itemBg,
+                        border: itemBorder,
+                        boxShadow: itemGlow,
                         animation: 'fadeIn 0.25s ease',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
                       }}
+                      title="Click team to view/award marks (Clue 1: 4pts, Clue 2: 3pts, Clue 3: 2pts, Clue 4: 1pt)"
                     >
-                      {/* Rank Position */}
-                      <div style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontFamily: 'var(--font-heading)',
-                        fontWeight: 900,
-                        fontSize: '13px',
-                        color: isFirst ? '#000000' : '#FFFFFF',
-                        background: isFirst ? 'var(--winner-gold)' : 'rgba(255, 255, 255, 0.1)',
-                        marginRight: '12px',
-                        flexShrink: 0,
-                      }}>
-                        #{entry.rank}
+                      {/* Top Row: Rank, Name, Timing, Score */}
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        {/* Rank Position */}
+                        <div style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontFamily: 'var(--font-heading)',
+                          fontWeight: 900,
+                          fontSize: '13px',
+                          color: rankColor,
+                          background: rankBg,
+                          marginRight: '12px',
+                          flexShrink: 0,
+                          boxShadow: isFirst || isSecond || isThird ? '0 2px 8px rgba(0,0,0,0.3)' : 'none',
+                        }}>
+                          #{entry.rank}
+                        </div>
+
+                        {/* Team Name & Offset */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            fontWeight: 800,
+                            fontSize: '14px',
+                            color: isFirst ? '#FFFFFF' : isSecond ? '#F8FAFC' : isThird ? '#FEF3C7' : 'var(--text-primary)',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}>
+                            {entry.name}
+                          </div>
+                          <div style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            color: isFirst
+                              ? 'var(--winner-gold)'
+                              : isSecond
+                              ? '#E2E8F0'
+                              : isThird
+                              ? '#F59E0B'
+                              : 'var(--text-muted)',
+                            marginTop: '2px',
+                          }}>
+                            {isFirst
+                              ? '🥇 1st Place (0.00s)'
+                              : isSecond
+                              ? `🥈 2nd Place (+${(entry.timeOffsetMs / 1000).toFixed(2)}s)`
+                              : isThird
+                              ? `🥉 3rd Place (+${(entry.timeOffsetMs / 1000).toFixed(2)}s)`
+                              : `+${(entry.timeOffsetMs / 1000).toFixed(2)}s behind #1`}
+                          </div>
+                        </div>
+
+                        {/* Current Score Badge */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          marginLeft: '8px',
+                          flexShrink: 0,
+                        }}>
+                          <span style={{
+                            fontSize: '11px',
+                            fontWeight: 900,
+                            padding: '3px 8px',
+                            borderRadius: '8px',
+                            background: currentScore > 0 ? 'rgba(251, 191, 36, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                            color: currentScore > 0 ? 'var(--winner-gold)' : 'var(--text-muted)',
+                            border: currentScore > 0 ? '1px solid rgba(251, 191, 36, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
+                          }}>
+                            ⭐ {currentScore} pts
+                          </span>
+                          {isFirst && <span style={{ fontSize: '16px' }}>👑</span>}
+                        </div>
                       </div>
 
-                      {/* Team Name & Offset */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          fontWeight: 800,
-                          fontSize: '14px',
-                          color: isFirst ? '#FFFFFF' : 'var(--text-primary)',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}>
-                          {entry.name}
+                      {/* Expandable Clue Point Award Buttons (Clue 1: 4pts, Clue 2: 3pts, Clue 3: 2pts, Clue 4: 1pt) */}
+                      {isSelected && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            marginTop: '10px',
+                            paddingTop: '10px',
+                            borderTop: '1px dashed rgba(255, 255, 255, 0.15)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px',
+                          }}
+                        >
+                          <div style={{ fontSize: '10.5px', fontWeight: 800, color: 'var(--accent-cyan)', display: 'flex', justifyContent: 'space-between', letterSpacing: '0.04em' }}>
+                            <span>AWARD MARKS (SELECT CLUE):</span>
+                            <span style={{ color: 'var(--winner-gold)' }}>Total: {currentScore} pts</span>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                            <button
+                              onClick={() => awardPoints(teamId, entry.name, 1)}
+                              className="btn btn-sm"
+                              style={{
+                                padding: '6px 2px',
+                                fontSize: '10.5px',
+                                fontWeight: 900,
+                                background: 'linear-gradient(135deg, #0284C7 0%, #2563EB 100%)',
+                                color: '#FFFFFF',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(255, 255, 255, 0.25)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '1px',
+                              }}
+                              title="Award 4 points for solving on Clue 1"
+                            >
+                              <span>Clue 1</span>
+                              <span style={{ fontSize: '11px', color: '#BAE6FD' }}>+4 pts</span>
+                            </button>
+                            <button
+                              onClick={() => awardPoints(teamId, entry.name, 2)}
+                              className="btn btn-sm"
+                              style={{
+                                padding: '6px 2px',
+                                fontSize: '10.5px',
+                                fontWeight: 900,
+                                background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
+                                color: '#FFFFFF',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(255, 255, 255, 0.25)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '1px',
+                              }}
+                              title="Award 3 points for solving on Clue 2"
+                            >
+                              <span>Clue 2</span>
+                              <span style={{ fontSize: '11px', color: '#A7F3D0' }}>+3 pts</span>
+                            </button>
+                            <button
+                              onClick={() => awardPoints(teamId, entry.name, 3)}
+                              className="btn btn-sm"
+                              style={{
+                                padding: '6px 2px',
+                                fontSize: '10.5px',
+                                fontWeight: 900,
+                                background: 'linear-gradient(135deg, #D97706 0%, #F59E0B 100%)',
+                                color: '#000000',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(255, 255, 255, 0.25)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '1px',
+                              }}
+                              title="Award 2 points for solving on Clue 3"
+                            >
+                              <span>Clue 3</span>
+                              <span style={{ fontSize: '11px', fontWeight: 900 }}>+2 pts</span>
+                            </button>
+                            <button
+                              onClick={() => awardPoints(teamId, entry.name, 4)}
+                              className="btn btn-sm"
+                              style={{
+                                padding: '6px 2px',
+                                fontSize: '10.5px',
+                                fontWeight: 900,
+                                background: 'linear-gradient(135deg, #7C3AED 0%, #A855F7 100%)',
+                                color: '#FFFFFF',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(255, 255, 255, 0.25)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '1px',
+                              }}
+                              title="Award 1 point for solving on Clue 4"
+                            >
+                              <span>Clue 4</span>
+                              <span style={{ fontSize: '11px', color: '#DDD6FE' }}>+1 pt</span>
+                            </button>
+                          </div>
                         </div>
-                        <div style={{
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          color: isFirst ? 'var(--winner-gold)' : 'var(--text-muted)',
-                          marginTop: '2px',
-                        }}>
-                          {isFirst ? '🥇 1st Place (0 ms)' : `+${entry.timeOffsetMs} ms behind #1`}
-                        </div>
-                      </div>
-
-                      {/* Winner Icon */}
-                      {isFirst && (
-                        <span style={{ fontSize: '18px', marginLeft: '6px' }}>👑</span>
                       )}
                     </div>
                   );
@@ -882,113 +1816,495 @@ export const ProjectorStageView = () => {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(3, 7, 18, 0.96)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
+            background: '#000000',
             zIndex: 99999999,
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '24px',
             animation: 'fadeIn 0.25s ease',
             cursor: 'zoom-out',
+            overflow: 'hidden',
           }}
         >
-          {/* Lightbox Top Header Bar */}
+          {/* Top Floating Control & Live Countdown Timer Bar */}
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              position: 'fixed',
+              position: 'absolute',
               top: 0,
               left: 0,
               right: 0,
-              height: '72px',
-              padding: '0 32px',
+              background: 'linear-gradient(to bottom, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.6) 65%, transparent 100%)',
+              padding: '20px 32px 36px 32px',
               display: 'flex',
-              justifyContent: 'space-between',
               alignItems: 'center',
-              background: 'rgba(11, 17, 32, 0.92)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
-              boxShadow: '0 4px 25px rgba(0, 0, 0, 0.5)',
-              zIndex: 30,
+              justifyContent: 'space-between',
+              zIndex: 20,
+              cursor: 'default',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', maxWidth: 'calc(100% - 240px)' }}>
-              <span className="pill pill-blue" style={{ fontSize: '13px', padding: '6px 16px', fontWeight: 900, flexShrink: 0 }}>
-                CLUE #{fullscreenImage.clueNumber} IMAGE
+            {/* Left: Challenge & Clue Info */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                color: 'var(--text-secondary)',
+                padding: '5px 14px',
+                borderRadius: '8px',
+                fontSize: '12.5px',
+                fontWeight: 800,
+                letterSpacing: '0.08em',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+              }}>
+                ROUND {activeRound} • CHALLENGE #{activeQuestionIndex + 1}
+              </span>
+              <span style={{
+                background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+                color: '#FFFFFF',
+                padding: '5px 14px',
+                borderRadius: '8px',
+                fontSize: '12.5px',
+                fontWeight: 900,
+                letterSpacing: '0.1em',
+                boxShadow: '0 2px 10px rgba(2, 132, 199, 0.4)',
+              }}>
+                CLUE #{fullscreenImage.clueNumber}
+              </span>
+            </div>
+
+            {/* Center: Live Running Countdown Timer */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              background: 'rgba(15, 23, 42, 0.88)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              padding: '8px 22px',
+              borderRadius: '30px',
+              border: `2px solid ${isTimerPaused ? 'var(--winner-gold)' : (timerRemaining <= 5 ? '#EF4444' : (timerRemaining <= 10 ? '#F59E0B' : 'var(--accent-cyan)'))}`,
+              boxShadow: isTimerPaused
+                ? '0 0 25px rgba(251, 191, 36, 0.5)'
+                : (timerRemaining <= 5 ? '0 0 25px rgba(239, 68, 68, 0.6)' : '0 0 20px rgba(56, 189, 248, 0.3)'),
+              animation: (timerRemaining <= 5 && !isTimerPaused && timerRemaining > 0) ? 'pulse 1s infinite' : 'none',
+            }}>
+              {isAnswerRevealed ? (
+                <span style={{ fontSize: '15px', fontWeight: 900, color: 'var(--winner-gold)' }}>
+                  🏆 ANSWER REVEALED
+                </span>
+              ) : isTimerPaused ? (
+                <div
+                  onClick={toggleTimerPause}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+                  title="Timer Paused — Click or press Key P to resume"
+                >
+                  <span style={{ fontSize: '18px' }}>⏸️</span>
+                  <span style={{ fontSize: '15px', fontWeight: 900, color: 'var(--winner-gold)', letterSpacing: '0.05em' }}>
+                    TIMER PAUSED
+                  </span>
+                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '6px' }}>
+                    Press P to Resume
+                  </span>
+                </div>
+              ) : (revealedClueCount === 4 && timerRemaining === 0) ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '18px' }}>⏰</span>
+                  <span style={{ fontSize: '15px', fontWeight: 900, color: 'var(--winner-gold)' }}>TIME'S UP</span>
+                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)' }}>• Awaiting Host</span>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '20px' }}>⏱️</span>
+                  <span style={{
+                    fontSize: '24px',
+                    fontWeight: 900,
+                    fontFamily: 'monospace',
+                    color: timerRemaining <= 5 ? '#EF4444' : (timerRemaining <= 10 ? '#F59E0B' : 'var(--accent-cyan)'),
+                    letterSpacing: '0.05em',
+                    textShadow: timerRemaining <= 5 ? '0 0 14px rgba(239, 68, 68, 0.8)' : '0 0 10px rgba(56, 189, 248, 0.5)',
+                  }}>
+                    {timerRemaining}s
+                  </span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', fontWeight: 700 }}>
+                    / {revealedClueCount === 1 ? '30s' : '15s'}
+                  </span>
+                </div>
+              )}
+
+              {/* Timer Pause/Play toggle button */}
+              {!isAnswerRevealed && !(revealedClueCount === 4 && timerRemaining === 0) && (
+                <button
+                  onClick={toggleTimerPause}
+                  style={{
+                    background: isTimerPaused ? 'var(--winner-gold)' : 'rgba(255, 255, 255, 0.15)',
+                    color: isTimerPaused ? '#000000' : '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '20px',
+                    padding: '5px 12px',
+                    fontSize: '11.5px',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    transition: 'all 0.2s ease',
+                  }}
+                  title={isTimerPaused ? 'Resume Timer (Key P)' : 'Pause Timer (Key P)'}
+                >
+                  <span>{isTimerPaused ? '▶️ Resume' : '⏸️ Pause'}</span>
+                  <span style={{ opacity: 0.75, fontSize: '9.5px' }}>(P)</span>
+                </button>
+              )}
+            </div>
+
+            {/* Right: Close button */}
+            <button
+              onClick={() => setFullscreenImage(null)}
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                background: 'rgba(0, 0, 0, 0.65)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1.5px solid rgba(255, 255, 255, 0.25)',
+                color: '#FFFFFF',
+                fontSize: '18px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s ease',
+              }}
+              title="Close (Esc)"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Main Content: Full-screen Image or Grand Typography View */}
+          {fullscreenImage.url ? (
+            <img
+              src={fullscreenImage.url}
+              alt={`Clue #${fullscreenImage.clueNumber} Fullscreen`}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100vw',
+                height: '100vh',
+                objectFit: 'contain',
+                display: 'block',
+                cursor: 'default',
+              }}
+            />
+          ) : (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '120px 80px',
+                background: 'radial-gradient(ellipse at center, rgba(30, 41, 59, 0.75) 0%, rgba(5, 8, 17, 0.98) 100%)',
+                cursor: 'default',
+              }}
+            >
+              <div style={{
+                maxWidth: '1000px',
+                width: '100%',
+                textAlign: 'center',
+                padding: '50px 40px',
+                borderRadius: '24px',
+                background: 'rgba(15, 23, 42, 0.65)',
+                backdropFilter: 'blur(24px)',
+                WebkitBackdropFilter: 'blur(24px)',
+                border: '1.5px solid rgba(56, 189, 248, 0.35)',
+                boxShadow: '0 25px 60px rgba(0, 0, 0, 0.8), 0 0 35px rgba(56, 189, 248, 0.25)',
+              }}>
+                <div style={{
+                  fontSize: '14px',
+                  fontWeight: 900,
+                  letterSpacing: '0.18em',
+                  color: 'var(--accent-cyan)',
+                  marginBottom: '18px',
+                }}>
+                  ✨ CLUE #{fullscreenImage.clueNumber} OF 4
+                </div>
+                <div style={{
+                  fontSize: '32px',
+                  fontWeight: 800,
+                  color: '#FFFFFF',
+                  lineHeight: 1.55,
+                  textShadow: '0 4px 20px rgba(0, 0, 0, 0.9)',
+                  whiteSpace: 'pre-line',
+                }}>
+                  {fullscreenImage.clueText}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ─── ANIMATED FLOATING CLOUD BUZZER STREAM IN FULLSCREEN AIR ─── */}
+          {queue.length > 0 && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: 'absolute',
+                right: '32px',
+                top: '95px',
+                zIndex: 35,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                maxWidth: '340px',
+                pointerEvents: 'auto',
+                cursor: 'default',
+              }}
+            >
+              {/* Floating Cloud Pill Header */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '7px 16px',
+                borderRadius: '24px',
+                background: 'rgba(15, 23, 42, 0.68)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                border: '1.2px solid rgba(255, 255, 255, 0.18)',
+                boxShadow: '0 8px 30px rgba(0, 0, 0, 0.45)',
+                width: 'fit-content',
+                alignSelf: 'flex-end',
+                animation: 'floatCloud 3s ease-in-out infinite alternate',
+              }}>
+                <span style={{ fontSize: '15px' }}>☁️⚡</span>
+                <span style={{
+                  fontSize: '11.5px',
+                  fontWeight: 900,
+                  letterSpacing: '0.12em',
+                  color: 'var(--winner-gold)',
+                  textShadow: '0 0 10px rgba(251, 191, 36, 0.4)',
+                }}>
+                  LIVE BUZZ CLOUD ({queue.length})
+                </span>
+              </div>
+
+              {/* Buzzed Teams Floating Cloud Cards */}
+              {queue.slice(0, 5).map((entry, idx) => {
+                const isFirst = entry.rank === 1;
+                const isSecond = entry.rank === 2;
+                const isThird = entry.rank === 3;
+                const timeFormatted = isFirst ? '0.00s' : `+${(entry.timeOffsetMs / 1000).toFixed(2)}s`;
+
+                const cloudBg = isFirst
+                  ? 'linear-gradient(135deg, rgba(251, 191, 36, 0.32) 0%, rgba(217, 119, 6, 0.22) 100%)'
+                  : isSecond
+                  ? 'linear-gradient(135deg, rgba(226, 232, 240, 0.25) 0%, rgba(148, 163, 184, 0.16) 100%)'
+                  : isThird
+                  ? 'linear-gradient(135deg, rgba(217, 119, 6, 0.26) 0%, rgba(180, 83, 9, 0.16) 100%)'
+                  : 'rgba(15, 23, 42, 0.55)';
+
+                const cloudBorder = isFirst
+                  ? '1.8px solid rgba(251, 191, 36, 0.85)'
+                  : isSecond
+                  ? '1.8px solid rgba(226, 232, 240, 0.8)'
+                  : isThird
+                  ? '1.8px solid rgba(205, 127, 50, 0.8)'
+                  : '1px solid rgba(255, 255, 255, 0.14)';
+
+                const cloudShadow = isFirst
+                  ? '0 8px 25px rgba(251, 191, 36, 0.35)'
+                  : isSecond
+                  ? '0 6px 20px rgba(203, 213, 225, 0.25)'
+                  : isThird
+                  ? '0 6px 20px rgba(205, 127, 50, 0.25)'
+                  : '0 4px 15px rgba(0, 0, 0, 0.3)';
+
+                return (
+                  <div
+                    key={entry.participantId || idx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '8px 14px',
+                      borderRadius: '24px',
+                      background: cloudBg,
+                      backdropFilter: 'blur(20px)',
+                      WebkitBackdropFilter: 'blur(20px)',
+                      border: cloudBorder,
+                      boxShadow: cloudShadow,
+                      animation: `slideInCloud 0.35s cubic-bezier(0.16, 1, 0.3, 1) ${idx * 0.06}s backwards, floatGentle ${3.5 + idx * 0.4}s ease-in-out infinite alternate`,
+                      transition: 'transform 0.2s ease',
+                    }}
+                  >
+                    {/* Rank Badge */}
+                    <div style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 900,
+                      fontSize: '12px',
+                      color: isFirst || isSecond ? '#000000' : '#FFFFFF',
+                      background: isFirst ? 'var(--winner-gold)' : isSecond ? '#E2E8F0' : isThird ? '#CD7F32' : 'rgba(255, 255, 255, 0.15)',
+                      flexShrink: 0,
+                      boxShadow: isFirst || isSecond || isThird ? '0 2px 8px rgba(0,0,0,0.3)' : 'none',
+                    }}>
+                      #{entry.rank}
+                    </div>
+
+                    {/* Team Name */}
+                    <div style={{
+                      flex: 1,
+                      minWidth: 0,
+                      fontWeight: 800,
+                      fontSize: '13.5px',
+                      color: '#FFFFFF',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      textShadow: '0 2px 8px rgba(0,0,0,0.8)',
+                    }}>
+                      {entry.name}
+                    </div>
+
+                    {/* Timing Seconds Badge */}
+                    <div style={{
+                      fontSize: '11px',
+                      fontFamily: 'monospace',
+                      fontWeight: 900,
+                      color: isFirst ? 'var(--winner-gold)' : isSecond ? '#E2E8F0' : isThird ? '#F59E0B' : 'rgba(255,255,255,0.8)',
+                      background: 'rgba(0, 0, 0, 0.45)',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      flexShrink: 0,
+                    }}>
+                      {timeFormatted}
+                    </div>
+
+                    {isFirst && <span style={{ fontSize: '14px' }}>👑</span>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Bottom Clue Text & Action Buttons Overlay — gradient fades up from the bottom */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              background: 'linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.75) 60%, transparent 100%)',
+              padding: '70px 40px 30px 40px',
+              display: 'flex',
+              alignItems: 'flex-end',
+              justifyContent: 'space-between',
+              gap: '24px',
+              flexWrap: 'wrap',
+              cursor: 'default',
+            }}
+          >
+            {/* Clue Number Badge & Clue Text */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: '320px' }}>
+              <span style={{
+                background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+                color: '#FFFFFF',
+                padding: '8px 18px',
+                borderRadius: '10px',
+                fontSize: '14px',
+                fontWeight: 900,
+                letterSpacing: '0.12em',
+                flexShrink: 0,
+                border: '1px solid rgba(255, 255, 255, 0.25)',
+                boxShadow: '0 4px 15px rgba(3, 105, 161, 0.5)',
+              }}>
+                CLUE #{fullscreenImage.clueNumber}
               </span>
               <span style={{
                 color: '#FFFFFF',
-                fontSize: '15px',
+                fontSize: '21px',
                 fontWeight: 700,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
+                lineHeight: 1.4,
+                textShadow: '0 2px 12px rgba(0, 0, 0, 0.8)',
               }}>
                 {fullscreenImage.clueText}
               </span>
             </div>
 
-            <button
-              onClick={() => setFullscreenImage(null)}
-              className="btn btn-secondary"
-              style={{
-                padding: '10px 22px',
-                fontSize: '13px',
-                fontWeight: 900,
-                borderRadius: '12px',
-                background: 'rgba(30, 41, 59, 0.95)',
-                border: '1.5px solid rgba(255, 255, 255, 0.25)',
-                color: '#FFFFFF',
-                flexShrink: 0,
-              }}
-            >
-              ✕ Exit Fullscreen (Esc)
-            </button>
-          </div>
+            {/* Direct Stage Control Buttons Inside Lightbox */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              {revealedClueCount < 4 ? (
+                <button
+                  onClick={() => {
+                    revealNextClue();
+                  }}
+                  className="btn btn-primary pulsing-glow"
+                  style={{
+                    padding: '10px 22px',
+                    fontSize: '14px',
+                    fontWeight: 800,
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #0284C7 0%, #4F46E5 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: 'pointer',
+                  }}
+                  title="Reveal next clue (Space)"
+                >
+                  <span>🔍 Next Clue ({revealedClueCount + 1}/4)</span>
+                  <span style={{ fontSize: '10px', opacity: 0.85, background: 'rgba(0,0,0,0.35)', padding: '2px 6px', borderRadius: '4px' }}>Space</span>
+                </button>
+              ) : null}
 
-          {/* Full Resolution Image Container */}
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              marginTop: '55px',
-              maxWidth: '92vw',
-              maxHeight: 'calc(100vh - 140px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '24px',
-              overflow: 'hidden',
-              border: '3px solid rgba(56, 189, 248, 0.75)',
-              boxShadow: '0 0 70px rgba(56, 189, 248, 0.35), 0 30px 90px rgba(0, 0, 0, 0.95)',
-              background: '#0B1120',
-            }}
-          >
-            <img
-              src={fullscreenImage.url}
-              alt={`Clue #${fullscreenImage.clueNumber} Fullscreen`}
-              style={{
-                maxWidth: '92vw',
-                maxHeight: 'calc(100vh - 140px)',
-                width: 'auto',
-                height: 'auto',
-                objectFit: 'contain',
-                display: 'block',
-              }}
-            />
-          </div>
+              <button
+                onClick={() => {
+                  setFullscreenImage(null);
+                  revealAnswer(true);
+                }}
+                className="btn btn-warning pulsing-glow"
+                style={{
+                  padding: '10px 24px',
+                  fontSize: '14px',
+                  fontWeight: 900,
+                  borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                  color: '#000000',
+                  boxShadow: '0 4px 20px rgba(245, 158, 11, 0.45)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                }}
+                title="Reveal Final Answer (Key A)"
+              >
+                <span>🎉 Reveal Final Answer</span>
+                <span style={{ fontSize: '10px', opacity: 0.9, background: 'rgba(0,0,0,0.35)', color: '#FFFFFF', padding: '2px 6px', borderRadius: '4px' }}>Key A</span>
+              </button>
 
-          <div style={{
-            position: 'absolute',
-            bottom: '18px',
-            fontSize: '12.5px',
-            color: 'var(--text-muted)',
-            letterSpacing: '0.04em',
-          }}>
-            Click anywhere or press [Esc] to exit image view
+              <button
+                onClick={() => setFullscreenImage(null)}
+                className="btn btn-secondary"
+                style={{
+                  padding: '10px 18px',
+                  fontSize: '13px',
+                  borderRadius: '10px',
+                }}
+                title="Close lightbox and return to stage grid (Key X or Esc)"
+              >
+                ✕ Close (X / Esc)
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -8,16 +8,17 @@ class AppConstants {
   // Server URLs & Default Arena
   static const String defaultRoomId = 'PINPOINT';
   static const String defaultPublicTunnelUrl =
-      'https://loud-ends-eva-observed.trycloudflare.com';
+      'https://game-ridge-pastor-hydrogen.trycloudflare.com';
   static const String defaultLocalWifiUrl = 'http://10.14.241.188:3000';
-  static const String defaultLocalhostUrl = 'http://localhost:3000';
+  static const String defaultLocalhostUrl = 'http://127.0.0.1:3000';
 
   // Server URL
-  // On Flutter web / desktop: default to localhost
-  // On mobile devices: default to public internet tunnel so any 4G/5G mobile user can join
+  // The user requested to ONLY use the Cloudflare tunnel.
+  // We explicitly append :443 to prevent the Dart socket_io_client bug
+  // where it attempts to upgrade to WSS on port 0.
   static String get defaultServerUrl {
-    if (kIsWeb) {
-      return defaultLocalhostUrl;
+    if (defaultPublicTunnelUrl.startsWith('https://') && !defaultPublicTunnelUrl.contains(':443')) {
+      return '$defaultPublicTunnelUrl:443';
     }
     return defaultPublicTunnelUrl;
   }

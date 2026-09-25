@@ -136,12 +136,22 @@ app.post('/api/questions', (req: Request, res: Response) => {
   }
 });
 
+// Serve clue images from public/clue-images
+const clueImagesPath = path.join(__dirname, '..', 'public', 'clue-images');
+if (fs.existsSync(clueImagesPath)) {
+  console.log(`🖼️  Serving clue images from: ${clueImagesPath}`);
+  app.use('/clue-images', express.static(clueImagesPath));
+}
+
 // 1. Serve React Website Admin Portal under /admin
 const reactAdminPath = path.join(__dirname, '..', '..', 'admin-portal', 'dist');
 if (fs.existsSync(reactAdminPath)) {
   console.log(`💻 Serving React Website Admin Portal from: ${reactAdminPath}`);
   app.use('/admin', express.static(reactAdminPath));
-  app.get('/admin*', (_req: Request, res: Response) => {
+  app.get('/admin', (_req: Request, res: Response) => {
+    res.sendFile(path.join(reactAdminPath, 'index.html'));
+  });
+  app.get('/admin/*', (_req: Request, res: Response) => {
     res.sendFile(path.join(reactAdminPath, 'index.html'));
   });
 }

@@ -2,7 +2,395 @@ import { Server, Socket } from 'socket.io';
 import { RoomManager } from '../rooms/room.manager';
 import { BuzzerEngine } from '../buzzer/buzzer.engine';
 
-export let sharedQuestions: any[] = [];
+export let sharedQuestions: any[] = [
+  // --- 1. Guess the Movie (Questions 1 to 5) ---
+  {
+    id: 'r1-m1',
+    round: 1,
+    category: 'Guess the Movie',
+    question: 'Guess the Movie 😉',
+    clues: [
+      'Clue 1',
+      'Clue 2',
+      'Clue 3',
+      'Clue 4',
+    ],
+    clueImages: [
+      '/clue-images/round1/Guess_the_movie_docx/img_1.jpeg',
+      '/clue-images/round1/Guess_the_movie_docx/img_2.jpeg',
+      '/clue-images/round1/Guess_the_movie_docx/img_3.jpeg',
+      '/clue-images/round1/Guess_the_movie_docx/img_4.jpeg',
+    ],
+    answer: 'Movie Challenge #1',
+    answerImage: '/clue-images/round1/Guess_the_movie_docx/img_5.jpeg',
+    points: 10,
+  },
+  {
+    id: 'r1-m2',
+    round: 1,
+    category: 'Guess the Movie',
+    question: 'Guess the Movie 😉',
+    clues: [
+      'Clue 1',
+      'Clue 2',
+      'Clue 3',
+      'Clue 4',
+    ],
+    clueImages: [
+      '/clue-images/round1/Guess_the_movie_docx/img_6.jpeg',
+      '/clue-images/round1/Guess_the_movie_docx/img_7.jpeg',
+      '/clue-images/round1/Guess_the_movie_docx/img_8.jpeg',
+      '/clue-images/round1/Guess_the_movie_docx/img_9.jpeg',
+    ],
+    answer: 'Movie Challenge #2',
+    answerImage: '/clue-images/round1/Guess_the_movie_docx/img_10.jpeg',
+    points: 10,
+  },
+  {
+    id: 'r1-m3',
+    round: 1,
+    category: 'Guess the Movie',
+    question: 'Guess the Movie 😉',
+    clues: [
+      'Clue 1',
+      'Clue 2',
+      'Clue 3',
+      'Clue 4',
+    ],
+    clueImages: [
+      '/clue-images/round1/Guess_the_movie_docx/img_11.jpeg',
+      '/clue-images/round1/Guess_the_movie_docx/img_12.jpeg',
+      '/clue-images/round1/Guess_the_movie_docx/img_13.jpeg',
+      '/clue-images/round1/Guess_the_movie_docx/img_14.jpeg',
+    ],
+    answer: 'Movie Challenge #3',
+    answerImage: '/clue-images/round1/Guess_the_movie_docx/img_15.jpeg',
+    points: 10,
+  },
+  {
+    id: 'r1-m4',
+    round: 1,
+    category: 'Guess the Movie',
+    question: 'Guess the Movie 😉',
+    clues: [
+      'Clue 1',
+      'Clue 2',
+      'Clue 3',
+      'Clue 4',
+    ],
+    clueImages: [
+      '/clue-images/round1/Guess_the_movie_docx/img_16.jpeg',
+      '/clue-images/round1/Guess_the_movie_docx/img_17.jpeg',
+      '/clue-images/round1/Guess_the_movie_docx/img_18.jpeg',
+      '/clue-images/round1/Guess_the_movie_docx/img_19.jpeg',
+    ],
+    answer: 'Movie Challenge #4',
+    answerImage: '/clue-images/round1/Guess_the_movie_docx/img_20.jpeg',
+    points: 10,
+  },
+  {
+    id: 'r1-m5',
+    round: 1,
+    category: 'Guess the Movie',
+    question: 'Guess the Movie 😉',
+    clues: [
+      'Clue 1',
+      'Clue 2',
+      'Clue 3',
+      'Clue 4',
+    ],
+    clueImages: [
+      '/clue-images/round1/Guess_the_movie_docx/img_21.jpeg',
+      '/clue-images/round1/Guess_the_movie_docx/img_22.jpeg',
+      '/clue-images/round1/Guess_the_movie_docx/img_23.jpeg',
+      '/clue-images/round1/Guess_the_movie_docx/img_24.jpeg',
+    ],
+    answer: 'Movie Challenge #5',
+    answerImage: '/clue-images/round1/Guess_the_movie_docx/img_25.jpeg',
+    points: 10,
+  },
+
+  // --- 2. Guess the Hidden Category (Questions 6 to 10) ---
+  {
+    id: 'r1-h1',
+    round: 1,
+    category: 'Guess the Hidden Category',
+    question: 'Guess the Hidden Category',
+    clues: [
+      'Clue 1 — Egg',
+      'Clue 2 — Coconut',
+      'Clue 3 — Turtle & Peanut',
+      'Clue 4 — Seashell',
+    ],
+    clueImages: ['', '', '', ''],
+    answer: 'Things That Have A Shell',
+    points: 10,
+  },
+  {
+    id: 'r1-h2',
+    round: 1,
+    category: 'Guess the Hidden Category',
+    question: 'Guess the Hidden Category',
+    clues: [
+      'Clue 1 — Butterfly & Eagle',
+      'Clue 2 — Airplane',
+      'Clue 3 — Kite',
+      'Clue 4 — Helicopter',
+    ],
+    clueImages: ['', '', '', ''],
+    answer: 'Things That Can Fly',
+    points: 10,
+  },
+  {
+    id: 'r1-h3',
+    round: 1,
+    category: 'Guess the Hidden Category',
+    question: 'Guess the Hidden Category',
+    clues: [
+      'Clue 1 — Sun & Fire',
+      'Clue 2 — Bulb',
+      'Clue 3 — Candle',
+      'Clue 4 — Torch',
+    ],
+    clueImages: ['', '', '', ''],
+    answer: 'Thing That Gives Light',
+    points: 10,
+  },
+  {
+    id: 'r1-h4',
+    round: 1,
+    category: 'Guess the Hidden Category',
+    question: 'Guess the Hidden Category',
+    clues: [
+      'Clue 1 — Book & Door',
+      'Clue 2 — Giftbox',
+      'Clue 3 — Laptop',
+      'Clue 4 — Envelope',
+    ],
+    clueImages: ['', '', '', ''],
+    answer: 'Things That Can Be Opened',
+    points: 10,
+  },
+  {
+    id: 'r1-h5',
+    round: 1,
+    category: 'Guess the Hidden Category',
+    question: 'Guess the Hidden Category',
+    clues: [
+      'Clue 1 — Apple & Football',
+      'Clue 2 — Orange',
+      'Clue 3 — Earth',
+      'Clue 4 — Basketball',
+    ],
+    clueImages: ['', '', '', ''],
+    answer: 'Things That Are Round',
+    points: 10,
+  },
+
+  // --- 3. Guess the Cartoon (Questions 11 to 15) ---
+  {
+    id: 'r1-c1',
+    round: 1,
+    category: 'Guess the Cartoon',
+    question: 'Guess the Cartoon',
+    clues: [
+      'Clue 1 — A normal holiday takes an unexpected turn after something falls from the sky.',
+      "Clue 2 — The hero's greatest ability isn't naturally his — it comes from something attached to him.",
+      'Clue 3 — One device gives him access to multiple extraterrestrial identities.',
+      'Clue 4 — He transforms into aliens using the Omnitrix.',
+    ],
+    clueImages: [
+      '',
+      '',
+      '',
+      '/clue-images/round1/Guess_the_Cartoon_docx/img_1.png',
+    ],
+    answer: 'Ben 10',
+    points: 10,
+  },
+  {
+    id: 'r1-c2',
+    round: 1,
+    category: 'Guess the Cartoon',
+    question: 'Guess the Cartoon',
+    clues: [
+      'Clue 1 — His greatest advantage comes from something he can consume, but it is not a magic potion.',
+      'Clue 2 — A peaceful kingdom repeatedly finds itself depending on one unusually strong child.',
+      'Clue 3 — His favourite snack is closely connected to his extraordinary strength.',
+      'Clue 4 — He protects a village called Dholakpur.',
+    ],
+    clueImages: [
+      '',
+      '',
+      '',
+      '/clue-images/round1/Guess_the_Cartoon_docx/img_2.jpeg',
+    ],
+    answer: 'Chhota Bheem',
+    points: 10,
+  },
+  {
+    id: 'r1-c3',
+    round: 1,
+    category: 'Guess the Cartoon',
+    question: 'Guess the Cartoon',
+    clues: [
+      'Clue 1 — A famous archaeologist spends his life searching for ancient objects, but his discoveries often bring dangerous magic.',
+      'Clue 2 — He is supported by an energetic young niece who is always ready to join missions.',
+      'Clue 3 — Many adventures involve powerful talismans that give people special abilities when collected.',
+      'Clue 4 — He works with Uncle, Jade, and Section 13 to defeat the Dark Hand.',
+    ],
+    clueImages: [
+      '',
+      '',
+      '',
+      '/clue-images/round1/Guess_the_Cartoon_docx/img_3.jpeg',
+    ],
+    answer: 'Jackie Chan Adventures',
+    points: 10,
+  },
+  {
+    id: 'r1-c4',
+    round: 1,
+    category: 'Guess the Cartoon',
+    question: 'Guess the Cartoon',
+    clues: [
+      'Clue 1 — A determined house guardian spends nearly every day trying to remove one small visitor who is cleverer than he appears.',
+      'Clue 2 — Their battles regularly involve traps, frying pans, broken furniture, and chases that destroy the house.',
+      'Clue 3 — Although they are enemies most of the time, they occasionally work together when a bigger danger appears.',
+      'Clue 4 — One is a cat named Tom, and the other is a mouse named Jerry.',
+    ],
+    clueImages: [
+      '',
+      '',
+      '',
+      '/clue-images/round1/Guess_the_Cartoon_docx/img_4.jpeg',
+    ],
+    answer: 'Tom and Jerry',
+    points: 10,
+  },
+  {
+    id: 'r1-c5',
+    round: 1,
+    category: 'Guess the Cartoon',
+    question: 'Guess the Cartoon',
+    clues: [
+      'Clue 1 — Two best friends live in a colourful town and always get into funny adventures.',
+      'Clue 2 — One friend is strong but loves eating food more than anything else.',
+      'Clue 3 — The other friend is clever and helps solve problems with smart ideas. The strong friend gets extra power after eating samosas.',
+      'Clue 4 — They live in Furfuri Nagar and are called Motu and Patlu.',
+    ],
+    clueImages: [
+      '',
+      '',
+      '',
+      '/clue-images/round1/Guess_the_Cartoon_docx/img_5.jpeg',
+    ],
+    answer: 'Motu Patlu',
+    points: 10,
+  },
+
+  // --- 4. Guess The Game (Questions 16 to 20) ---
+  {
+    id: 'r1-g1',
+    round: 1,
+    category: 'Guess The Game',
+    question: 'Guess The Game',
+    clues: [
+      'Clue 1 — Graffiti & endless railway tracks',
+      'Clue 2 — Collect gold coins while dashing at top speed',
+      'Clue 3 — Ride hoverboards to bounce back after crashes',
+      'Clue 4 — Escape the grumpy inspector and his dog',
+    ],
+    clueImages: [
+      '',
+      '',
+      '',
+      '/clue-images/round1/Guess_The_Game_docx/img_1.jpeg',
+    ],
+    answer: 'Subway Surfers',
+    points: 10,
+  },
+  {
+    id: 'r1-g2',
+    round: 1,
+    category: 'Guess The Game',
+    question: 'Guess The Game',
+    clues: [
+      'Clue 1 — Drop onto a remote battle island with 50 players',
+      'Clue 2 — Parachute down from the sky to pick your landing spot',
+      'Clue 3 — Loot weapons, tactical gear & survive the shrinking safe zone',
+      'Clue 4 — The last survivor standing claims the ultimate Booyah!',
+    ],
+    clueImages: [
+      '',
+      '',
+      '',
+      '/clue-images/round1/Guess_The_Game_docx/img_2.jpeg',
+    ],
+    answer: 'Free Fire',
+    points: 10,
+  },
+  {
+    id: 'r1-g3',
+    round: 1,
+    category: 'Guess The Game',
+    question: 'Guess The Game',
+    clues: [
+      'Clue 1 — Match dynamic colours and numbers on your turn',
+      'Clue 2 — Change play direction with Reverse and Skip cards',
+      'Clue 3 — Force your rivals to pick 4 cards with Draw Four',
+      'Clue 4 — Shout the game name out loud when you have only one card left!',
+    ],
+    clueImages: [
+      '',
+      '',
+      '',
+      '/clue-images/round1/Guess_The_Game_docx/img_3.jpeg',
+    ],
+    answer: 'UNO',
+    points: 10,
+  },
+  {
+    id: 'r1-g4',
+    round: 1,
+    category: 'Guess The Game',
+    question: 'Guess The Game',
+    clues: [
+      'Clue 1 — Futuristic spaceship requiring vital maintenance tasks',
+      'Clue 2 — Cooperative crewmates working together to survive',
+      'Clue 3 — Sneak through vents and call emergency meetings',
+      'Clue 4 — Find and vote out the sneaky Impostor before it is too late',
+    ],
+    clueImages: [
+      '',
+      '',
+      '',
+      '/clue-images/round1/Guess_The_Game_docx/img_4.jpeg',
+    ],
+    answer: 'Among Us',
+    points: 10,
+  },
+  {
+    id: 'r1-g5',
+    round: 1,
+    category: 'Guess The Game',
+    question: 'Guess The Game',
+    clues: [
+      'Clue 1 — Build, defend and customize your fantasy village',
+      'Clue 2 — Harvest gold and pink elixir from collectors',
+      'Clue 3 — Train barbarians, archers, giants and dragons',
+      'Clue 4 — Upgrade your townhall and lead your clan to epic war',
+    ],
+    clueImages: [
+      '',
+      '',
+      '',
+      '/clue-images/round1/Guess_The_Game_docx/img_5.jpeg',
+    ],
+    answer: 'Clash of Clans',
+    points: 10,
+  },
+];;
 export let sharedGameSettings: any = {
   gameTitle: 'Pinpoint Challenge',
   pointsPerCorrect: 10,
@@ -636,6 +1024,19 @@ export function registerSocketHandlers(io: Server, roomManager: RoomManager) {
         io.emit('answer_revealed', { isRevealed: isAnswerRevealed });
         if (typeof callback === 'function') {
           callback({ success: true, isRevealed: isAnswerRevealed });
+        }
+      } catch (err: any) {
+        if (typeof callback === 'function') {
+          callback({ success: false, error: err.message });
+        }
+      }
+    });
+
+    socket.on('update_team_scores', (data, callback) => {
+      try {
+        io.emit('team_scores_updated', { teamScores: data?.teamScores || {} });
+        if (typeof callback === 'function') {
+          callback({ success: true });
         }
       } catch (err: any) {
         if (typeof callback === 'function') {

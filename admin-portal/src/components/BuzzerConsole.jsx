@@ -20,9 +20,17 @@ export const BuzzerConsole = () => {
     resetClues,
     revealAnswer,
     setActiveQuestion,
+    activeRound,
+    switchRound,
+    teamScores,
+    awardPoints,
+    adjustPoints,
+    resetTeamScores,
   } = useAdmin();
 
   const [copiedCode, setCopiedCode] = useState(false);
+  const [selectedTeamIdForPoints, setSelectedTeamIdForPoints] = useState(null);
+  const [scoreTab, setScoreTab] = useState(activeRound === 2 ? 'round2' : 'round1');
 
   const currentQ = questions && questions[activeQuestionIndex];
 
@@ -275,8 +283,17 @@ export const BuzzerConsole = () => {
                 💡
               </div>
               <div>
-                <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--accent-cyan)', letterSpacing: '0.12em' }}>
-                  STAGE CLUE PROGRESSION (SYNCED TO PROJECTOR)
+                <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--accent-cyan)', letterSpacing: '0.12em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>STAGE CLUE PROGRESSION</span>
+                  <span style={{
+                    background: activeRound === 1 ? 'rgba(56, 189, 248, 0.2)' : 'rgba(251, 191, 36, 0.2)',
+                    color: activeRound === 1 ? 'var(--accent-cyan)' : 'var(--winner-gold)',
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    border: `1px solid ${activeRound === 1 ? 'rgba(56, 189, 248, 0.4)' : 'rgba(251, 191, 36, 0.4)'}`,
+                  }}>
+                    ROUND {activeRound}
+                  </span>
                 </div>
                 <div style={{ fontSize: '17px', fontWeight: 800, color: '#FFFFFF' }}>
                   Challenge #{activeQuestionIndex + 1}: {currentQ.question || 'Mystery Subject'}
@@ -284,7 +301,47 @@ export const BuzzerConsole = () => {
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              {/* Round Switcher */}
+              <div style={{
+                display: 'inline-flex',
+                background: 'rgba(0,0,0,0.35)',
+                padding: '3px',
+                borderRadius: '9px',
+                border: '1px solid rgba(255,255,255,0.08)',
+              }}>
+                <button
+                  onClick={() => switchRound(1)}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: activeRound === 1 ? 'linear-gradient(135deg, #0284C7 0%, #4F46E5 100%)' : 'transparent',
+                    color: activeRound === 1 ? '#FFFFFF' : 'var(--text-muted)',
+                    fontSize: '11px',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  R1 (20 Qs)
+                </button>
+                <button
+                  onClick={() => switchRound(2)}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: activeRound === 2 ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)' : 'transparent',
+                    color: activeRound === 2 ? '#000000' : 'var(--text-muted)',
+                    fontSize: '11px',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  R2 (Movies)
+                </button>
+              </div>
+
               <button
                 onClick={() => setActiveQuestion(Math.max(0, activeQuestionIndex - 1))}
                 disabled={activeQuestionIndex === 0}
@@ -448,63 +505,251 @@ export const BuzzerConsole = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {queue.map((entry, idx) => {
                 const isFirst = entry.rank === 1;
+                const isSecond = entry.rank === 2;
+                const isThird = entry.rank === 3;
+                const teamId = entry.participantId || entry.name;
+                const isSelected = selectedTeamIdForPoints === teamId;
+                const currentScore = teamScores && teamScores[teamId] ? teamScores[teamId].score : 0;
+
+                const itemBg = isFirst
+                  ? 'linear-gradient(135deg, rgba(251, 191, 36, 0.22) 0%, rgba(217, 119, 6, 0.12) 100%)'
+                  : isSecond
+                  ? 'linear-gradient(135deg, rgba(226, 232, 240, 0.18) 0%, rgba(148, 163, 184, 0.1) 100%)'
+                  : isThird
+                  ? 'linear-gradient(135deg, rgba(217, 119, 6, 0.18) 0%, rgba(180, 83, 9, 0.1) 100%)'
+                  : 'var(--bg-input)';
+
+                const itemBorder = isFirst
+                  ? '2px solid rgba(251, 191, 36, 0.8)'
+                  : isSecond
+                  ? '2px solid rgba(203, 213, 225, 0.8)'
+                  : isThird
+                  ? '2px solid rgba(205, 127, 50, 0.8)'
+                  : '1px solid var(--border-glass)';
+
+                const itemGlow = isFirst
+                  ? '0 0 25px rgba(251, 191, 36, 0.25)'
+                  : isSecond
+                  ? '0 0 16px rgba(203, 213, 225, 0.2)'
+                  : isThird
+                  ? '0 0 16px rgba(205, 127, 50, 0.2)'
+                  : 'none';
+
+                const rankBg = isFirst
+                  ? 'var(--winner-gold)'
+                  : isSecond
+                  ? '#E2E8F0'
+                  : isThird
+                  ? '#CD7F32'
+                  : 'rgba(255, 255, 255, 0.1)';
+
+                const rankColor = isFirst || isSecond ? '#000000' : '#FFFFFF';
 
                 return (
                   <div
-                    key={entry.participantId || idx}
+                    key={teamId || idx}
+                    onClick={() => setSelectedTeamIdForPoints(isSelected ? null : teamId)}
                     style={{
                       display: 'flex',
-                      alignItems: 'center',
+                      flexDirection: 'column',
                       padding: '14px 18px',
                       borderRadius: 'var(--radius-md)',
-                      background: isFirst
-                        ? 'linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(217, 119, 6, 0.1) 100%)'
-                        : 'var(--bg-input)',
-                      border: isFirst ? '2px solid rgba(251, 191, 36, 0.7)' : '1px solid var(--border-glass)',
-                      boxShadow: isFirst ? '0 0 25px rgba(251, 191, 36, 0.25)' : 'none',
+                      background: itemBg,
+                      border: itemBorder,
+                      boxShadow: itemGlow,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
                     }}
+                    title="Click team to view/award marks (Clue 1: 4pts, Clue 2: 3pts, Clue 3: 2pts, Clue 4: 1pt)"
                   >
-                    {/* Rank Badge */}
-                    <div style={{
-                      width: '38px',
-                      height: '38px',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontFamily: 'var(--font-heading)',
-                      fontWeight: 900,
-                      fontSize: '15px',
-                      color: isFirst ? '#000000' : '#FFFFFF',
-                      background: isFirst ? 'var(--winner-gold)' : 'rgba(255, 255, 255, 0.1)',
-                      marginRight: '16px',
-                      flexShrink: 0,
-                    }}>
-                      #{entry.rank}
+                    {/* Header: Rank, Name, Timing, Score */}
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      {/* Rank Badge */}
+                      <div style={{
+                        width: '38px',
+                        height: '38px',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontFamily: 'var(--font-heading)',
+                        fontWeight: 900,
+                        fontSize: '15px',
+                        color: rankColor,
+                        background: rankBg,
+                        marginRight: '16px',
+                        flexShrink: 0,
+                        boxShadow: isFirst || isSecond || isThird ? '0 2px 10px rgba(0,0,0,0.3)' : 'none',
+                      }}>
+                        #{entry.rank}
+                      </div>
+
+                      {/* Team Name & Delta */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          fontWeight: isFirst ? 900 : 700,
+                          fontSize: '16px',
+                          color: isFirst ? '#FFFFFF' : isSecond ? '#F8FAFC' : isThird ? '#FEF3C7' : 'var(--text-primary)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {entry.name}
+                        </div>
+                        <div style={{
+                          fontSize: '12px',
+                          color: isFirst
+                            ? 'var(--winner-gold)'
+                            : isSecond
+                            ? '#E2E8F0'
+                            : isThird
+                            ? '#F59E0B'
+                            : 'var(--text-muted)',
+                          fontWeight: 700,
+                          fontFamily: 'var(--font-mono)',
+                          marginTop: '2px',
+                        }}>
+                          {isFirst
+                            ? '🥇 1st PLACE (0 ms offset)'
+                            : isSecond
+                            ? `🥈 2nd PLACE (+${entry.timeOffsetMs} ms)`
+                            : isThird
+                            ? `🥉 3rd PLACE (+${entry.timeOffsetMs} ms)`
+                            : `+${entry.timeOffsetMs} ms behind #1`}
+                        </div>
+                      </div>
+
+                      {/* Current Score Pill */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        marginLeft: '10px',
+                        flexShrink: 0,
+                      }}>
+                        <span style={{
+                          fontSize: '12px',
+                          fontWeight: 900,
+                          padding: '4px 10px',
+                          borderRadius: '8px',
+                          background: currentScore > 0 ? 'rgba(251, 191, 36, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                          color: currentScore > 0 ? 'var(--winner-gold)' : 'var(--text-muted)',
+                          border: currentScore > 0 ? '1px solid rgba(251, 191, 36, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
+                        }}>
+                          ⭐ {currentScore} pts
+                        </span>
+                        {isFirst && <span style={{ fontSize: '22px' }}>👑</span>}
+                      </div>
                     </div>
 
-                    {/* Team Name & Delta */}
-                    <div style={{ flex: 1 }}>
-                      <div style={{
-                        fontWeight: isFirst ? 900 : 700,
-                        fontSize: '16px',
-                        color: isFirst ? '#FFFFFF' : 'var(--text-primary)',
-                      }}>
-                        {entry.name}
+                    {/* Expandable Clue Point Award Buttons */}
+                    {isSelected && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          marginTop: '12px',
+                          paddingTop: '12px',
+                          borderTop: '1px dashed rgba(255, 255, 255, 0.15)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px',
+                        }}
+                      >
+                        <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--accent-cyan)', display: 'flex', justifyContent: 'space-between', letterSpacing: '0.04em', flexWrap: 'wrap', gap: '6px' }}>
+                          <span>AWARD MARKS FOR {entry.name.toUpperCase()} (ROUND {activeRound} • {currentQ?.category || 'General'}):</span>
+                          <span style={{ color: 'var(--winner-gold)' }}>Current: {currentScore} pts</span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                          <button
+                            onClick={() => awardPoints(teamId, entry.name, 1)}
+                            className="btn btn-sm"
+                            style={{
+                              padding: '8px 4px',
+                              fontSize: '11.5px',
+                              fontWeight: 900,
+                              background: 'linear-gradient(135deg, #0284C7 0%, #2563EB 100%)',
+                              color: '#FFFFFF',
+                              borderRadius: '8px',
+                              border: '1px solid rgba(255, 255, 255, 0.25)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: '2px',
+                            }}
+                            title="Award 4 points for solving on Clue 1"
+                          >
+                            <span>Clue 1</span>
+                            <span style={{ fontSize: '12px', color: '#BAE6FD' }}>+4 pts</span>
+                          </button>
+                          <button
+                            onClick={() => awardPoints(teamId, entry.name, 2)}
+                            className="btn btn-sm"
+                            style={{
+                              padding: '8px 4px',
+                              fontSize: '11.5px',
+                              fontWeight: 900,
+                              background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
+                              color: '#FFFFFF',
+                              borderRadius: '8px',
+                              border: '1px solid rgba(255, 255, 255, 0.25)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: '2px',
+                            }}
+                            title="Award 3 points for solving on Clue 2"
+                          >
+                            <span>Clue 2</span>
+                            <span style={{ fontSize: '12px', color: '#A7F3D0' }}>+3 pts</span>
+                          </button>
+                          <button
+                            onClick={() => awardPoints(teamId, entry.name, 3)}
+                            className="btn btn-sm"
+                            style={{
+                              padding: '8px 4px',
+                              fontSize: '11.5px',
+                              fontWeight: 900,
+                              background: 'linear-gradient(135deg, #D97706 0%, #F59E0B 100%)',
+                              color: '#000000',
+                              borderRadius: '8px',
+                              border: '1px solid rgba(255, 255, 255, 0.25)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: '2px',
+                            }}
+                            title="Award 2 points for solving on Clue 3"
+                          >
+                            <span>Clue 3</span>
+                            <span style={{ fontSize: '12px', fontWeight: 900 }}>+2 pts</span>
+                          </button>
+                          <button
+                            onClick={() => awardPoints(teamId, entry.name, 4)}
+                            className="btn btn-sm"
+                            style={{
+                              padding: '8px 4px',
+                              fontSize: '11.5px',
+                              fontWeight: 900,
+                              background: 'linear-gradient(135deg, #7C3AED 0%, #A855F7 100%)',
+                              color: '#FFFFFF',
+                              borderRadius: '8px',
+                              border: '1px solid rgba(255, 255, 255, 0.25)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: '2px',
+                            }}
+                            title="Award 1 point for solving on Clue 4"
+                          >
+                            <span>Clue 4</span>
+                            <span style={{ fontSize: '12px', color: '#DDD6FE' }}>+1 pt</span>
+                          </button>
+                        </div>
                       </div>
-                      <div style={{
-                        fontSize: '12px',
-                        color: isFirst ? 'var(--winner-gold)' : 'var(--text-muted)',
-                        fontWeight: 700,
-                        fontFamily: 'var(--font-mono)',
-                        marginTop: '2px',
-                      }}>
-                        {isFirst ? '🥇 1st PLACE (0 ms offset)' : `+${entry.timeOffsetMs} ms behind #1`}
-                      </div>
-                    </div>
-
-                    {isFirst && (
-                      <span style={{ fontSize: '24px' }}>👑</span>
                     )}
                   </div>
                 );
@@ -592,6 +837,339 @@ export const BuzzerConsole = () => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* ─── LIVE TEAM SCOREBOARD & MARKS TABLE ─── */}
+      <div className="glass-card" style={{ padding: '26px 30px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--accent-cyan)', letterSpacing: '0.12em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>SCORING ENGINE</span>
+              <span style={{ background: 'rgba(56, 189, 248, 0.2)', color: 'var(--accent-cyan)', padding: '2px 8px', borderRadius: '6px', border: '1px solid rgba(56, 189, 248, 0.4)' }}>
+                RULE: CLUE 1 = 4pts • CLUE 2 = 3pts • CLUE 3 = 2pts • CLUE 4 = 1pt
+              </span>
+            </div>
+            <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#FFFFFF', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>📊</span> LIVE SCOREBOARD & MARKS TABLE
+            </h3>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              onClick={() => {
+                if (window.confirm('Are you sure you want to reset all team scores to zero?')) {
+                  resetTeamScores();
+                }
+              }}
+              className="btn btn-outline btn-sm"
+              style={{
+                borderColor: 'rgba(239, 68, 68, 0.4)',
+                color: 'var(--status-red)',
+                fontSize: '11.5px',
+                padding: '6px 12px',
+              }}
+            >
+              🔄 Reset All Scores
+            </button>
+          </div>
+        </div>
+
+        {/* Round Filter Tabs */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '18px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          paddingBottom: '12px',
+          flexWrap: 'wrap',
+        }}>
+          <button
+            onClick={() => setScoreTab('round1')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '10px',
+              border: scoreTab === 'round1' ? '1.5px solid #38BDF8' : '1px solid rgba(255, 255, 255, 0.1)',
+              background: scoreTab === 'round1' ? 'linear-gradient(135deg, rgba(2, 132, 199, 0.35) 0%, rgba(79, 70, 229, 0.25) 100%)' : 'rgba(255, 255, 255, 0.04)',
+              color: scoreTab === 'round1' ? '#FFFFFF' : 'var(--text-muted)',
+              fontWeight: 800,
+              fontSize: '12.5px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <span>📁</span>
+            <span>ROUND 1 STANDINGS</span>
+            <span style={{
+              fontSize: '10px',
+              background: 'rgba(56, 189, 248, 0.25)',
+              color: 'var(--accent-cyan)',
+              padding: '2px 6px',
+              borderRadius: '6px',
+              fontWeight: 900,
+            }}>
+              Category Wise
+            </span>
+          </button>
+
+          <button
+            onClick={() => setScoreTab('round2')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '10px',
+              border: scoreTab === 'round2' ? '1.5px solid #F59E0B' : '1px solid rgba(255, 255, 255, 0.1)',
+              background: scoreTab === 'round2' ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.35) 0%, rgba(217, 119, 6, 0.25) 100%)' : 'rgba(255, 255, 255, 0.04)',
+              color: scoreTab === 'round2' ? '#FFFFFF' : 'var(--text-muted)',
+              fontWeight: 800,
+              fontSize: '12.5px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <span>🎬</span>
+            <span>ROUND 2 STANDINGS</span>
+            <span style={{
+              fontSize: '10px',
+              background: 'rgba(245, 158, 11, 0.25)',
+              color: 'var(--winner-gold)',
+              padding: '2px 6px',
+              borderRadius: '6px',
+              fontWeight: 900,
+            }}>
+              Category Wise
+            </span>
+          </button>
+
+          <button
+            onClick={() => setScoreTab('all')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '10px',
+              border: scoreTab === 'all' ? '1.5px solid #10B981' : '1px solid rgba(255, 255, 255, 0.1)',
+              background: scoreTab === 'all' ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.35) 0%, rgba(5, 150, 105, 0.25) 100%)' : 'rgba(255, 255, 255, 0.04)',
+              color: scoreTab === 'all' ? '#FFFFFF' : 'var(--text-muted)',
+              fontWeight: 800,
+              fontSize: '12.5px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <span>🏆</span>
+            <span>OVERALL TOTAL</span>
+          </button>
+        </div>
+
+        {/* Scoreboard List */}
+        {(() => {
+          const allEntries = Object.entries(teamScores || {});
+          if (allEntries.length === 0) {
+            return (
+              <div style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '36px', marginBottom: '10px' }}>🏆</div>
+                <div style={{ fontWeight: 700, fontSize: '15px', color: '#FFFFFF', marginBottom: '6px' }}>
+                  No Marks Awarded Yet
+                </div>
+                <div style={{ fontSize: '13px', maxWidth: '540px', margin: '0 auto', lineHeight: 1.5 }}>
+                  Click any team in the <strong>Live Buzzer Standings</strong> above and choose which clue they solved on (<strong>Clue 1 = 4pts</strong>, <strong>Clue 2 = 3pts</strong>, <strong>Clue 3 = 2pts</strong>, <strong>Clue 4 = 1pt</strong>) to award marks instantly!
+                </div>
+              </div>
+            );
+          }
+
+          const sortedEntries = allEntries.slice().sort((a, b) => {
+            const dataA = a[1];
+            const dataB = b[1];
+            if (scoreTab === 'round1') {
+              const sA = dataA.round1Score !== undefined ? dataA.round1Score : dataA.score;
+              const sB = dataB.round1Score !== undefined ? dataB.round1Score : dataB.score;
+              return sB - sA;
+            }
+            if (scoreTab === 'round2') {
+              const sA = dataA.round2Score !== undefined ? dataA.round2Score : 0;
+              const sB = dataB.round2Score !== undefined ? dataB.round2Score : 0;
+              return sB - sA;
+            }
+            return (dataB.score || 0) - (dataA.score || 0);
+          });
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {sortedEntries.map(([teamId, data], index) => {
+                const rankNum = index + 1;
+                const isFirst = rankNum === 1;
+                const isSecond = rankNum === 2;
+                const isThird = rankNum === 3;
+
+                const displayScore = scoreTab === 'round1'
+                  ? (data.round1Score !== undefined ? data.round1Score : data.score)
+                  : scoreTab === 'round2'
+                  ? (data.round2Score !== undefined ? data.round2Score : 0)
+                  : data.score;
+
+                const categoryEntries = Object.entries(data.categoryScores || {});
+
+                return (
+                  <div
+                    key={teamId}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '14px 18px',
+                      borderRadius: '12px',
+                      background: isFirst
+                        ? 'linear-gradient(135deg, rgba(251, 191, 36, 0.16) 0%, rgba(217, 119, 6, 0.08) 100%)'
+                        : isSecond
+                        ? 'linear-gradient(135deg, rgba(226, 232, 240, 0.14) 0%, rgba(148, 163, 184, 0.06) 100%)'
+                        : isThird
+                        ? 'linear-gradient(135deg, rgba(217, 119, 6, 0.14) 0%, rgba(180, 83, 9, 0.06) 100%)'
+                        : 'var(--bg-input)',
+                      border: isFirst
+                        ? '1.8px solid var(--winner-gold)'
+                        : isSecond
+                        ? '1.8px solid #CBD5E1'
+                        : isThird
+                        ? '1.8px solid #CD7F32'
+                        : '1px solid var(--border-glass)',
+                      boxShadow: isFirst ? '0 0 20px rgba(251, 191, 36, 0.2)' : 'none',
+                      flexWrap: 'wrap',
+                      gap: '12px',
+                    }}
+                  >
+                    {/* Rank & Team Name */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: '240px' }}>
+                      <div style={{
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 900,
+                        fontSize: '14px',
+                        color: isFirst || isSecond ? '#000000' : '#FFFFFF',
+                        background: isFirst ? 'var(--winner-gold)' : isSecond ? '#E2E8F0' : isThird ? '#CD7F32' : 'rgba(255, 255, 255, 0.1)',
+                      }}>
+                        #{rankNum}
+                      </div>
+
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span>{data.name || teamId}</span>
+                          {isFirst && <span>👑</span>}
+                        </div>
+
+                        {/* Category Score Badges */}
+                        {categoryEntries.length > 0 ? (
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+                            {categoryEntries.map(([cat, pts]) => (
+                              <span
+                                key={cat}
+                                style={{
+                                  fontSize: '11px',
+                                  fontWeight: 700,
+                                  background: 'rgba(255, 255, 255, 0.06)',
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  color: 'var(--accent-cyan)',
+                                }}
+                              >
+                                {cat}: <strong style={{ color: '#FFFFFF' }}>{pts} pts</strong>
+                              </span>
+                            ))}
+                          </div>
+                        ) : data.lastAwardedClue ? (
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            Last awarded: Clue #{data.lastAwardedClue} (+{data.lastPointsAwarded} pts)
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {/* Score display & Adjustments */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        gap: '4px',
+                        background: 'rgba(0, 0, 0, 0.3)',
+                        padding: '6px 14px',
+                        borderRadius: '10px',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                      }}>
+                        <span style={{
+                          fontSize: '22px',
+                          fontWeight: 900,
+                          fontFamily: 'monospace',
+                          color: isFirst ? 'var(--winner-gold)' : 'var(--accent-cyan)',
+                        }}>
+                          {displayScore}
+                        </span>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>
+                          PTS
+                        </span>
+                      </div>
+
+                      {/* Quick Adjust Buttons */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <button
+                          onClick={() => adjustPoints(teamId, data.name, -1)}
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '4px 8px', fontSize: '11px', fontWeight: 800 }}
+                          title="Subtract 1 point"
+                        >
+                          -1
+                        </button>
+                        <button
+                          onClick={() => adjustPoints(teamId, data.name, 1)}
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '4px 8px', fontSize: '11px', fontWeight: 800, color: '#10B981' }}
+                          title="Add 1 point"
+                        >
+                          +1
+                        </button>
+                        <button
+                          onClick={() => adjustPoints(teamId, data.name, 2)}
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '4px 8px', fontSize: '11px', fontWeight: 800, color: '#F59E0B' }}
+                          title="Add 2 points"
+                        >
+                          +2
+                        </button>
+                        <button
+                          onClick={() => adjustPoints(teamId, data.name, 3)}
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '4px 8px', fontSize: '11px', fontWeight: 800, color: '#0284C7' }}
+                          title="Add 3 points"
+                        >
+                          +3
+                        </button>
+                        <button
+                          onClick={() => adjustPoints(teamId, data.name, 4)}
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '4px 8px', fontSize: '11px', fontWeight: 800, color: '#A855F7' }}
+                          title="Add 4 points"
+                        >
+                          +4
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

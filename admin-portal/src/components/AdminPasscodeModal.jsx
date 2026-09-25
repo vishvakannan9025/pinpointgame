@@ -60,7 +60,7 @@ export const AdminPasscodeModal = () => {
             <input
               type={showPassword ? 'text' : 'password'}
               className="input-field"
-              placeholder="Enter passcode (default: admin123)"
+              placeholder="Enter passcode..."
               value={passcode}
               onChange={(e) => {
                 setPasscode(e.target.value);

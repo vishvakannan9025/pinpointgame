@@ -8,7 +8,30 @@ import { ProjectorStageView } from './components/ProjectorStageView';
 import { NetworkQrHub } from './components/NetworkQrHub';
 
 const AdminPortalContent = () => {
-  const { isAuthenticated, activeTab } = useAdmin();
+  const { isAuthenticated, activeTab, lockRound, startRound } = useAdmin();
+
+  // Global Admin Keyboard Shortcuts across all tabs
+  // 'L' -> Lock Buzzer
+  // 'U' -> Unlock Buzzer (Unbuzz / start active round)
+  React.useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const handleGlobalShortcuts = (e) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName)) return;
+      if (e.target?.isContentEditable) return;
+
+      if (e.code === 'KeyL' || e.key === 'l' || e.key === 'L') {
+        e.preventDefault();
+        lockRound();
+      } else if (e.code === 'KeyU' || e.key === 'u' || e.key === 'U') {
+        e.preventDefault();
+        startRound();
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalShortcuts);
+    return () => window.removeEventListener('keydown', handleGlobalShortcuts);
+  }, [isAuthenticated, lockRound, startRound]);
 
   if (!isAuthenticated) {
     return <AdminPasscodeModal />;
