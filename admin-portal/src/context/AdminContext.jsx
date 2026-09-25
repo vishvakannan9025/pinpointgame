@@ -44,8 +44,8 @@ export const AdminProvider = ({ children }) => {
       try {
         const parsed = JSON.parse(saved);
         if (parsed && Array.isArray(parsed)) {
-          // If Round 1 has fewer than 20 questions (e.g. was filtered to 5), auto-restore full 20 questions
-          if (currentRoundNum === 1 && parsed.length < ROUND_1_QUESTIONS.length) {
+          // If Round 1 has fewer than 20 questions or has old clues for question 6, auto-restore updated questions
+          if (currentRoundNum === 1 && (parsed.length < ROUND_1_QUESTIONS.length || !parsed.some(q => q.id === 'r1-h1' && q.clues?.some(c => c.toLowerCase().includes('egg & coconut'))))) {
             localStorage.setItem('pinpoint_questions', JSON.stringify(defaultForRound));
             return defaultForRound;
           }

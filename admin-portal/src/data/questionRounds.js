@@ -120,9 +120,9 @@ export const ROUND_1_QUESTIONS = [
     category: 'Guess the Hidden Category',
     question: 'Guess the Hidden Category',
     clues: [
-      'Clue 1 — Egg',
-      'Clue 2 — Coconut',
-      'Clue 3 — Turtle & Peanut',
+      'Clue 1 — Egg & Coconut',
+      'Clue 2 — Turtle',
+      'Clue 3 — Peanut',
       'Clue 4 — Seashell',
     ],
     clueImages: ['', '', '', ''],

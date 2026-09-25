@@ -8,7 +8,7 @@ class AppConstants {
   // Server URLs & Default Arena
   static const String defaultRoomId = 'PINPOINT';
   static const String defaultPublicTunnelUrl =
-      'https://game-ridge-pastor-hydrogen.trycloudflare.com';
+      'https://games-next-forest-forests.trycloudflare.com';
   static const String defaultLocalWifiUrl = 'http://10.14.241.188:3000';
   static const String defaultLocalhostUrl = 'http://127.0.0.1:3000';
 
