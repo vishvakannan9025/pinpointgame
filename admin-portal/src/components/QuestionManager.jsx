@@ -264,7 +264,7 @@ export const QuestionManager = () => {
           {[
             { id: 'ALL', label: 'All 10 Challenges', icon: '🌟' },
             { id: 'Guess the Lyrics', label: '1. Guess the Lyrics (1-5)', icon: '🎵' },
-            { id: 'Demo 1 - Identify the Tamil Movie', label: '2. Demo 1 - Tamil Movies (6-10)', icon: '🎬' },
+            { id: 'Movie Frames Identification', label: '2. Movie Frames Identification (6-10)', icon: '🎬' },
           ].map((cat) => {
             const isSelected = selectedCat === cat.id;
             return (

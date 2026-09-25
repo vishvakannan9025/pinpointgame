@@ -948,7 +948,9 @@ function registerSocketHandlers(io, roomManager) {
         });
         socket.on('reveal_next_clue', (_, callback) => {
             try {
-                if (exports.revealedClueCount < 4) {
+                const currentQ = exports.sharedQuestions && exports.sharedQuestions[exports.activeQuestionIndex];
+                const maxClues = (currentQ?.clues && currentQ.clues.length > 0) ? currentQ.clues.length : 4;
+                if (exports.revealedClueCount < maxClues) {
                     exports.revealedClueCount++;
                 }
                 io.emit('clue_count_changed', { count: exports.revealedClueCount });

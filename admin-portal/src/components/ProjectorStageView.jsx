@@ -138,13 +138,15 @@ export const ProjectorStageView = () => {
           subtitle: 'Round 2 - Challenge Set 1',
           description: 'Identify the iconic Tamil song lyrics from translated English lines, genre, music director, and cast! Clue 1: 30s • Clues 2-4: 15s each.',
         };
+      case 'Movie Frames Identification':
+      case 'Identify the Tamil Movie':
       case 'Demo 1 - Identify the Tamil Movie':
         return {
           num: 2,
           icon: '🎬',
-          title: 'Identify the Tamil Movie',
+          title: 'Movie Frames Identification',
           subtitle: 'Round 2 - Challenge Set 2',
-          description: 'Identify the Tamil movie from visual frames and scene clues! Clue 1: 30s • Clues 2-4: 15s each.',
+          description: 'Identify the Tamil movie from 2 visual frame scene clues! Clue 1: 30s • Clue 2: 15s.',
         };
       default:
         return {
@@ -152,29 +154,22 @@ export const ProjectorStageView = () => {
           icon: '⭐',
           title: catName || 'Pinpoint Challenge',
           subtitle: 'Round 1 Challenge',
-          description: '4 clues will be revealed progressively.',
+          description: 'Clues will be revealed progressively.',
         };
     }
   };
 
   const categoryMeta = getCategoryMeta(currentCategory);
 
-  const clues = currentQ.clues && currentQ.clues.length >= 4
-    ? currentQ.clues.slice(0, 4)
-    : [
-        ...(currentQ.clues || []),
-        'No clue provided.',
-        'No clue provided.',
-        'No clue provided.',
-        'No clue provided.',
-      ].slice(0, 4);
+  const clues = currentQ.clues && currentQ.clues.length > 0
+    ? currentQ.clues
+    : ['No clue provided.'];
 
-  const clueImages = currentQ.clueImages && currentQ.clueImages.length >= 4
-    ? currentQ.clueImages.slice(0, 4)
-    : [
-        ...(currentQ.clueImages || []),
-        '', '', '', '',
-      ].slice(0, 4);
+  const clueImages = currentQ.clueImages && currentQ.clueImages.length > 0
+    ? currentQ.clueImages
+    : [];
+
+  const totalClues = clues.length;
 
   const answer = currentQ.answer || (currentQ.options && currentQ.options[currentQ.correctOptionIndex]) || 'REVEALED';
 
@@ -198,7 +193,7 @@ export const ProjectorStageView = () => {
           clueText: answer,
         };
       }
-      if (revealedClueCount > 0 && revealedClueCount <= 4) {
+      if (revealedClueCount > 0 && revealedClueCount <= totalClues) {
         const latestClueIndex = revealedClueCount - 1;
         const latestClueImage = clueImages[latestClueIndex];
         if (latestClueImage) {
@@ -211,7 +206,7 @@ export const ProjectorStageView = () => {
       }
       return null;
     });
-  }, [isAnswerRevealed, currentQ.answerImage, answer, revealedClueCount, clueImages, clues]);
+  }, [isAnswerRevealed, currentQ.answerImage, answer, revealedClueCount, clueImages, clues, totalClues]);
 
   // Progressive button action handler (Spacebar / Click)
   const handleProgressiveAction = useCallback(() => {
@@ -221,7 +216,7 @@ export const ProjectorStageView = () => {
       return;
     }
 
-    if (revealedClueCount < 4) {
+    if (revealedClueCount < totalClues) {
       revealNextClue();
     } else if (!isAnswerRevealed) {
       setFullscreenImage(null);
@@ -239,7 +234,7 @@ export const ProjectorStageView = () => {
         }
       }
     }
-  }, [categoryTitleActive, setCategoryTitleActive, revealedClueCount, isAnswerRevealed, revealNextClue, revealAnswer, activeQuestionIndex, questions, setActiveQuestion]);
+  }, [categoryTitleActive, setCategoryTitleActive, revealedClueCount, totalClues, isAnswerRevealed, revealNextClue, revealAnswer, activeQuestionIndex, questions, setActiveQuestion]);
 
   const handleResetToFirstQuestion = useCallback(() => {
     setActiveQuestion(0);
@@ -493,6 +488,61 @@ export const ProjectorStageView = () => {
             </div>
           )}
 
+          {/* Round 2 Category Quick-Jump Tabs (Lyrics, Movie Frames) */}
+          {activeRound === 2 && !isFullscreen && (
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '3px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              padding: '2px 4px',
+              borderRadius: '8px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+            }}>
+              {[
+                { cat: 'Guess the Lyrics', icon: '🎵', label: 'Lyrics' },
+                { cat: 'Movie Frames Identification', icon: '🎬', label: 'Movie Frames' },
+              ].map((item) => {
+                const isCurrent = currentCategory.toLowerCase().includes(item.label.toLowerCase()) ||
+                  (item.label === 'Movie Frames' && (currentCategory.includes('Movie') || currentCategory.includes('Frames')));
+                return (
+                  <button
+                    key={item.cat}
+                    onClick={() => {
+                      const idx = questions.findIndex(q =>
+                        q.category === item.cat ||
+                        q.category.toLowerCase().includes(item.label.toLowerCase()) ||
+                        (item.label === 'Movie Frames' && (q.category.includes('Movie') || q.category.includes('Frames')))
+                      );
+                      if (idx !== -1) {
+                        setActiveQuestion(idx);
+                        setCategoryTitleActive(false);
+                      }
+                    }}
+                    style={{
+                      padding: '4px 9px',
+                      borderRadius: '6px',
+                      border: isCurrent ? '1px solid #F59E0B' : 'none',
+                      background: isCurrent ? 'rgba(245, 158, 11, 0.25)' : 'transparent',
+                      color: isCurrent ? '#F59E0B' : 'var(--text-muted)',
+                      fontSize: '11px',
+                      fontWeight: isCurrent ? 900 : 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title={`Select and navigate to ${item.cat}`}
+                  >
+                    <span>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {/* Category Title Slide Button */}
           <button
             onClick={() => setCategoryTitleActive((prev) => !prev)}
@@ -543,7 +593,7 @@ export const ProjectorStageView = () => {
                   <span>PAUSED</span>
                   <span style={{ fontSize: isFullscreen ? '10.5px' : '9.5px', opacity: 0.85 }}>(Key P)</span>
                 </span>
-              ) : (revealedClueCount === 4 && timerRemaining === 0) ? (
+              ) : (revealedClueCount === totalClues && timerRemaining === 0) ? (
                 <span style={{ fontSize: isFullscreen ? '14px' : '11px', fontWeight: 900, color: 'var(--winner-gold)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span>⏰ TIME'S UP</span>
                   <span style={{ fontSize: isFullscreen ? '11px' : '9.5px', color: 'rgba(255,255,255,0.7)' }}>• Await Host</span>
@@ -571,7 +621,7 @@ export const ProjectorStageView = () => {
               )}
 
               {/* Pause / Resume Button */}
-              {!isAnswerRevealed && !(revealedClueCount === 4 && timerRemaining === 0) && (
+              {!isAnswerRevealed && !(revealedClueCount === totalClues && timerRemaining === 0) && (
                 <button
                   onClick={toggleTimerPause}
                   style={{
@@ -1088,7 +1138,7 @@ export const ProjectorStageView = () => {
                           letterSpacing: '0.14em',
                           color: '#FFFFFF',
                         }}>
-                          CLUE {activeClueNumber} OF 4
+                          CLUE {activeClueNumber} OF {totalClues}
                         </span>
                       </div>
 
@@ -1171,7 +1221,7 @@ export const ProjectorStageView = () => {
                         letterSpacing: '0.14em',
                         color: '#FFFFFF',
                       }}>
-                        CLUE {activeClueNumber} OF 4
+                        CLUE {activeClueNumber} OF {totalClues}
                       </span>
                     </div>
 
@@ -1209,7 +1259,7 @@ export const ProjectorStageView = () => {
                     gap: '10px',
                     marginTop: '8px',
                   }}>
-                    {[1, 2, 3, 4].map(n => (
+                    {Array.from({ length: totalClues }, (_, i) => i + 1).map(n => (
                       <div key={n} style={{
                         width: isFullscreen ? '12px' : '10px',
                         height: isFullscreen ? '12px' : '10px',
@@ -1243,7 +1293,7 @@ export const ProjectorStageView = () => {
             flexShrink: 0,
             flexWrap: 'wrap',
           }}>
-            {revealedClueCount < 4 ? (
+            {revealedClueCount < totalClues ? (
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
                 <button
                   onClick={revealNextClue}
@@ -1708,7 +1758,7 @@ export const ProjectorStageView = () => {
                             <span>AWARD MARKS (SELECT CLUE):</span>
                             <span style={{ color: 'var(--winner-gold)' }}>Total: {currentScore} pts</span>
                           </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(4, totalClues)}, 1fr)`, gap: '6px' }}>
                             <button
                               onClick={() => awardPoints(teamId, entry.name, 1)}
                               className="btn btn-sm"
@@ -1753,50 +1803,54 @@ export const ProjectorStageView = () => {
                               <span>Clue 2</span>
                               <span style={{ fontSize: '11px', color: '#A7F3D0' }}>+3 pts</span>
                             </button>
-                            <button
-                              onClick={() => awardPoints(teamId, entry.name, 3)}
-                              className="btn btn-sm"
-                              style={{
-                                padding: '6px 2px',
-                                fontSize: '10.5px',
-                                fontWeight: 900,
-                                background: 'linear-gradient(135deg, #D97706 0%, #F59E0B 100%)',
-                                color: '#000000',
-                                borderRadius: '8px',
-                                border: '1px solid rgba(255, 255, 255, 0.25)',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '1px',
-                              }}
-                              title="Award 2 points for solving on Clue 3"
-                            >
-                              <span>Clue 3</span>
-                              <span style={{ fontSize: '11px', fontWeight: 900 }}>+2 pts</span>
-                            </button>
-                            <button
-                              onClick={() => awardPoints(teamId, entry.name, 4)}
-                              className="btn btn-sm"
-                              style={{
-                                padding: '6px 2px',
-                                fontSize: '10.5px',
-                                fontWeight: 900,
-                                background: 'linear-gradient(135deg, #7C3AED 0%, #A855F7 100%)',
-                                color: '#FFFFFF',
-                                borderRadius: '8px',
-                                border: '1px solid rgba(255, 255, 255, 0.25)',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '1px',
-                              }}
-                              title="Award 1 point for solving on Clue 4"
-                            >
-                              <span>Clue 4</span>
-                              <span style={{ fontSize: '11px', color: '#DDD6FE' }}>+1 pt</span>
-                            </button>
+                            {totalClues >= 3 && (
+                              <button
+                                onClick={() => awardPoints(teamId, entry.name, 3)}
+                                className="btn btn-sm"
+                                style={{
+                                  padding: '6px 2px',
+                                  fontSize: '10.5px',
+                                  fontWeight: 900,
+                                  background: 'linear-gradient(135deg, #D97706 0%, #F59E0B 100%)',
+                                  color: '#000000',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: '1px',
+                                }}
+                                title="Award 2 points for solving on Clue 3"
+                              >
+                                <span>Clue 3</span>
+                                <span style={{ fontSize: '11px', fontWeight: 900 }}>+2 pts</span>
+                              </button>
+                            )}
+                            {totalClues >= 4 && (
+                              <button
+                                onClick={() => awardPoints(teamId, entry.name, 4)}
+                                className="btn btn-sm"
+                                style={{
+                                  padding: '6px 2px',
+                                  fontSize: '10.5px',
+                                  fontWeight: 900,
+                                  background: 'linear-gradient(135deg, #7C3AED 0%, #A855F7 100%)',
+                                  color: '#FFFFFF',
+                                  borderRadius: '8px',
+                                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: '1px',
+                                }}
+                                title="Award 1 point for solving on Clue 4"
+                              >
+                                <span>Clue 4</span>
+                                <span style={{ fontSize: '11px', color: '#DDD6FE' }}>+1 pt</span>
+                              </button>
+                            )}
                           </div>
                         </div>
                       )}
@@ -1905,7 +1959,7 @@ export const ProjectorStageView = () => {
                     Press P to Resume
                   </span>
                 </div>
-              ) : (revealedClueCount === 4 && timerRemaining === 0) ? (
+              ) : (revealedClueCount === totalClues && timerRemaining === 0) ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ fontSize: '18px' }}>⏰</span>
                   <span style={{ fontSize: '15px', fontWeight: 900, color: 'var(--winner-gold)' }}>TIME'S UP</span>
@@ -1931,7 +1985,7 @@ export const ProjectorStageView = () => {
               )}
 
               {/* Timer Pause/Play toggle button */}
-              {!isAnswerRevealed && !(revealedClueCount === 4 && timerRemaining === 0) && (
+              {!isAnswerRevealed && !(revealedClueCount === totalClues && timerRemaining === 0) && (
                 <button
                   onClick={toggleTimerPause}
                   style={{

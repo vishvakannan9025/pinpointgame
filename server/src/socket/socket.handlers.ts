@@ -988,7 +988,9 @@ export function registerSocketHandlers(io: Server, roomManager: RoomManager) {
 
     socket.on('reveal_next_clue', (_, callback) => {
       try {
-        if (revealedClueCount < 4) {
+        const currentQ = sharedQuestions && sharedQuestions[activeQuestionIndex];
+        const maxClues = (currentQ?.clues && currentQ.clues.length > 0) ? currentQ.clues.length : 4;
+        if (revealedClueCount < maxClues) {
           revealedClueCount++;
         }
         io.emit('clue_count_changed', { count: revealedClueCount });

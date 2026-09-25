@@ -53,6 +53,11 @@ export const AdminProvider = ({ children }) => {
             localStorage.setItem('pinpoint_questions', JSON.stringify(defaultForRound));
             return defaultForRound;
           }
+          // If Round 2 has old demo questions or doesn't match ROUND_2_QUESTIONS length, refresh!
+          if (currentRoundNum === 2 && (parsed.some(q => q.id?.includes('demo') || q.category?.includes('Demo 1')) || parsed.length !== ROUND_2_QUESTIONS.length)) {
+            localStorage.setItem('pinpoint_questions', JSON.stringify(defaultForRound));
+            return defaultForRound;
+          }
           return parsed;
         }
       } catch (_) {}
@@ -599,14 +604,16 @@ export const AdminProvider = ({ children }) => {
 
   const revealNextClue = useCallback(() => {
     setRevealedClueCount((prev) => {
-      if (prev < 4) {
+      const currentQ = questions[activeQuestionIndex];
+      const maxClues = (currentQ?.clues && currentQ.clues.length > 0) ? currentQ.clues.length : 4;
+      if (prev < maxClues) {
         const next = prev + 1;
         socketService.emit('reveal_next_clue');
         return next;
       }
       return prev;
     });
-  }, []);
+  }, [questions, activeQuestionIndex]);
 
   const setClueCount = useCallback((count) => {
     const valid = Math.max(1, Math.min(4, count));
@@ -673,14 +680,16 @@ export const AdminProvider = ({ children }) => {
     const interval = setInterval(() => {
       setTimerRemaining((prev) => {
         if (prev <= 1) {
-          if (revealedClueCount < 4) {
+          const currentQ = questions[activeQuestionIndex];
+          const maxClues = (currentQ?.clues && currentQ.clues.length > 0) ? currentQ.clues.length : 4;
+          if (revealedClueCount < maxClues) {
             // Automatically advance to the next clue
             revealNextClue();
             const nextDur = 15;
             setTimerDuration(nextDur);
             return nextDur;
           } else {
-            // Clue 4 finished: stop timer, stay on Clue 4. DO NOT reveal answer!
+            // Final clue finished: stop timer, stay on final clue. DO NOT reveal answer!
             setIsTimerRunning(false);
             return 0;
           }
@@ -690,7 +699,7 @@ export const AdminProvider = ({ children }) => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isTimerRunning, isTimerPaused, categoryTitleActive, isAnswerRevealed, revealedClueCount, revealNextClue]);
+  }, [isTimerRunning, isTimerPaused, categoryTitleActive, isAnswerRevealed, revealedClueCount, revealNextClue, questions, activeQuestionIndex]);
 
   return (
     <AdminContext.Provider

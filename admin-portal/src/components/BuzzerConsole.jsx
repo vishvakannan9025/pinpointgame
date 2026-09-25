@@ -364,9 +364,9 @@ export const BuzzerConsole = () => {
             </div>
           </div>
 
-          {/* 4 Clues Status Grid */}
+          {/* Clues Status Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', marginBottom: '20px' }}>
-            {[1, 2, 3, 4].map((num) => {
+            {Array.from({ length: (currentQ?.clues?.length || 4) }, (_, i) => i + 1).map((num) => {
               const isRev = revealedClueCount >= num;
               const isCurrent = revealedClueCount === num;
               return (
@@ -408,7 +408,7 @@ export const BuzzerConsole = () => {
 
           {/* Progressive Action Button */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
-            {revealedClueCount < 4 ? (
+            {revealedClueCount < (currentQ?.clues?.length || 4) ? (
               <button
                 onClick={revealNextClue}
                 className="btn btn-primary btn-md pulsing-glow"
@@ -659,7 +659,7 @@ export const BuzzerConsole = () => {
                           <span>AWARD MARKS FOR {entry.name.toUpperCase()} (ROUND {activeRound} • {currentQ?.category || 'General'}):</span>
                           <span style={{ color: 'var(--winner-gold)' }}>Current: {currentScore} pts</span>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(4, currentQ?.clues?.length || 4)}, 1fr)`, gap: '8px' }}>
                           <button
                             onClick={() => awardPoints(teamId, entry.name, 1)}
                             className="btn btn-sm"
@@ -704,50 +704,54 @@ export const BuzzerConsole = () => {
                             <span>Clue 2</span>
                             <span style={{ fontSize: '12px', color: '#A7F3D0' }}>+3 pts</span>
                           </button>
-                          <button
-                            onClick={() => awardPoints(teamId, entry.name, 3)}
-                            className="btn btn-sm"
-                            style={{
-                              padding: '8px 4px',
-                              fontSize: '11.5px',
-                              fontWeight: 900,
-                              background: 'linear-gradient(135deg, #D97706 0%, #F59E0B 100%)',
-                              color: '#000000',
-                              borderRadius: '8px',
-                              border: '1px solid rgba(255, 255, 255, 0.25)',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              gap: '2px',
-                            }}
-                            title="Award 2 points for solving on Clue 3"
-                          >
-                            <span>Clue 3</span>
-                            <span style={{ fontSize: '12px', fontWeight: 900 }}>+2 pts</span>
-                          </button>
-                          <button
-                            onClick={() => awardPoints(teamId, entry.name, 4)}
-                            className="btn btn-sm"
-                            style={{
-                              padding: '8px 4px',
-                              fontSize: '11.5px',
-                              fontWeight: 900,
-                              background: 'linear-gradient(135deg, #7C3AED 0%, #A855F7 100%)',
-                              color: '#FFFFFF',
-                              borderRadius: '8px',
-                              border: '1px solid rgba(255, 255, 255, 0.25)',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              gap: '2px',
-                            }}
-                            title="Award 1 point for solving on Clue 4"
-                          >
-                            <span>Clue 4</span>
-                            <span style={{ fontSize: '12px', color: '#DDD6FE' }}>+1 pt</span>
-                          </button>
+                          {(currentQ?.clues?.length || 4) >= 3 && (
+                            <button
+                              onClick={() => awardPoints(teamId, entry.name, 3)}
+                              className="btn btn-sm"
+                              style={{
+                                padding: '8px 4px',
+                                fontSize: '11.5px',
+                                fontWeight: 900,
+                                background: 'linear-gradient(135deg, #D97706 0%, #F59E0B 100%)',
+                                color: '#000000',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(255, 255, 255, 0.25)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '2px',
+                              }}
+                              title="Award 2 points for solving on Clue 3"
+                            >
+                              <span>Clue 3</span>
+                              <span style={{ fontSize: '12px', fontWeight: 900 }}>+2 pts</span>
+                            </button>
+                          )}
+                          {(currentQ?.clues?.length || 4) >= 4 && (
+                            <button
+                              onClick={() => awardPoints(teamId, entry.name, 4)}
+                              className="btn btn-sm"
+                              style={{
+                                padding: '8px 4px',
+                                fontSize: '11.5px',
+                                fontWeight: 900,
+                                background: 'linear-gradient(135deg, #7C3AED 0%, #A855F7 100%)',
+                                color: '#FFFFFF',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(255, 255, 255, 0.25)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '2px',
+                              }}
+                              title="Award 1 point for solving on Clue 4"
+                            >
+                              <span>Clue 4</span>
+                              <span style={{ fontSize: '12px', color: '#DDD6FE' }}>+1 pt</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}
